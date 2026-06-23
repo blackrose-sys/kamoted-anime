@@ -9,6 +9,7 @@ import { Play } from 'lucide-react';
 
 export function Home() {
   const [latestAnime, setLatestAnime] = useState<AnimeData[]>([]);
+  const [recentlyUpdated, setRecentlyUpdated] = useState<AnimeData[]>([]);
   const [topAnime, setTopAnime] = useState<AnimeData[]>([]);
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,6 +21,11 @@ export function Home() {
       try {
         const latestRes = await fetch('https://api.jikan.moe/v4/seasons/now?limit=24');
         const latestData = await latestRes.json();
+        
+        await new Promise(r => setTimeout(r, 1000)); // Bypass rate limit
+        
+        const recentRes = await fetch('https://api.jikan.moe/v4/watch/episodes');
+        const recentData = await recentRes.json();
         
         await new Promise(r => setTimeout(r, 1000)); // Bypass rate limit
         
@@ -35,7 +41,19 @@ export function Home() {
           setHistory(data || []);
         }
         
+        // Map recently updated data to match AnimeData structure
+        const mappedRecent = (recentData.data || []).map((item: any) => ({
+          mal_id: item.entry.mal_id,
+          title: item.entry.title,
+          images: item.entry.images,
+          score: null,
+          year: null,
+          // Extract episode number from the episodes array
+          episodes: item.episodes && item.episodes.length > 0 ? parseInt(item.episodes[0].title.replace(/\D/g, ''), 10) || null : null
+        }));
+
         setLatestAnime(latestData.data || []);
+        setRecentlyUpdated(mappedRecent);
         setTopAnime(topData.data || []);
       } catch (err) {
         console.error(err);
@@ -84,10 +102,10 @@ export function Home() {
             </section>
           )}
 
-          {/* Latest Episodes Section */}
+          {/* Recently Updated Section */}
           <section>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '2rem' }}>
-              <h2 style={{ fontSize: '1.5rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '-0.05em' }}>Latest Episodes</h2>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '-0.05em' }}>Recently Updated</h2>
               <Link to="/browse" style={{ color: 'var(--accent-primary)', fontSize: '0.875rem', fontWeight: 700 }}>View All</Link>
             </div>
 
@@ -99,8 +117,8 @@ export function Home() {
               </div>
             ) : (
               <div className="grid">
-                {latestAnime.map(anime => (
-                  <AnimeCard key={anime.mal_id} anime={anime} />
+                {recentlyUpdated.slice(0, 24).map((anime, idx) => (
+                  <AnimeCard key={`${anime.mal_id}-${idx}`} anime={anime} />
                 ))}
               </div>
             )}

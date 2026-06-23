@@ -35,6 +35,7 @@ export function Register() {
         password,
         options: {
           data: { username },
+          emailRedirectTo: undefined // Disable magic link, send OTP code instead
         }
       });
       

@@ -5,7 +5,7 @@ import { Loader2, Bookmark, Clock, Trash2, Play, Camera, Upload } from 'lucide-r
 import { supabase } from '../lib/supabase';
 
 export function Profile() {
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, isLoading } = useAuth();
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [activeTab, setActiveTab] = useState<'settings' | 'watchlist' | 'history'>('settings');
@@ -24,6 +24,14 @@ export function Profile() {
       }
     }
   }, [user, activeTab]);
+
+  if (isLoading) {
+    return (
+      <main className="container fade-in" style={{ flex: 1, padding: '8rem 1.5rem', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <Loader2 className="animate-spin" size={48} color="var(--accent-primary)" />
+      </main>
+    );
+  }
 
   if (!user) {
     return <Navigate to="/login" replace />;

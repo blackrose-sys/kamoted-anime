@@ -71,21 +71,41 @@ export function Profile() {
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
-        const scale = zoom;
+        // Calculate the actual crop area based on the visible area
+        const containerWidth = 400; // Match the modal container width
+        const containerHeight = 350; // Match the modal container height
+        const imgAspect = image.width / image.height;
+        const containerAspect = containerWidth / containerHeight;
         
-        // Calculate source crop area
-        const sourceX = (-position.x / scale);
-        const sourceY = (-position.y / scale);
-        const sourceWidth = cropSize / scale;
-        const sourceHeight = cropSize / scale;
+        let drawWidth, drawHeight;
+        if (imgAspect > containerAspect) {
+          drawHeight = containerHeight;
+          drawWidth = containerHeight * imgAspect;
+        } else {
+          drawWidth = containerWidth;
+          drawHeight = containerWidth / imgAspect;
+        }
+        
+        const scale = zoom;
+        const scaledWidth = drawWidth * scale;
+        const scaledHeight = drawHeight * scale;
+        
+        // Calculate the center crop area (200px circle in the modal)
+        const cropX = (containerWidth - 200) / 2;
+        const cropY = (containerHeight - 200) / 2;
+        
+        // Source coordinates (accounting for position and zoom)
+        const sourceX = (cropX - position.x - (containerWidth - scaledWidth) / 2) / scale;
+        const sourceY = (cropY - position.y - (containerHeight - scaledHeight) / 2) / scale;
+        const sourceSize = 200 / scale;
         
         ctx.drawImage(
           image,
-          sourceX, sourceY, sourceWidth, sourceHeight,
+          sourceX, sourceY, sourceSize, sourceSize,
           0, 0, cropSize, cropSize
         );
         
-        const croppedImage = canvas.toDataURL('image/jpeg', 0.9);
+        const croppedImage = canvas.toDataURL('image/jpeg', 0.95);
         updateUser({ ...user, avatar_url: croppedImage });
         setShowCropModal(false);
         setAvatarFile(null);
@@ -113,22 +133,44 @@ export function Profile() {
     image.src = imagePreview;
     
     image.onload = () => {
-      const cropSize = 150; // Smaller preview
+      const cropSize = 150;
       canvas.width = cropSize;
       canvas.height = cropSize;
       
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       
+      // Calculate the actual crop area based on the visible area
+      const containerWidth = canvas.width;
+      const containerHeight = canvas.height;
+      const imgAspect = image.width / image.height;
+      const containerAspect = containerWidth / containerHeight;
+      
+      let drawWidth, drawHeight;
+      if (imgAspect > containerAspect) {
+        drawHeight = containerHeight;
+        drawWidth = containerHeight * imgAspect;
+      } else {
+        drawWidth = containerWidth;
+        drawHeight = containerWidth / imgAspect;
+      }
+      
       const scale = zoom;
-      const sourceX = (-position.x / scale);
-      const sourceY = (-position.y / scale);
-      const sourceWidth = cropSize / scale;
-      const sourceHeight = cropSize / scale;
+      const scaledWidth = drawWidth * scale;
+      const scaledHeight = drawHeight * scale;
+      
+      // Calculate the center crop area
+      const cropX = (containerWidth - cropSize) / 2;
+      const cropY = (containerHeight - cropSize) / 2;
+      
+      // Source coordinates (accounting for position and zoom)
+      const sourceX = (cropX - position.x - (containerWidth - scaledWidth) / 2) / scale;
+      const sourceY = (cropY - position.y - (containerHeight - scaledHeight) / 2) / scale;
+      const sourceSize = cropSize / scale;
       
       ctx.drawImage(
         image,
-        sourceX, sourceY, sourceWidth, sourceHeight,
+        sourceX, sourceY, sourceSize, sourceSize,
         0, 0, cropSize, cropSize
       );
       

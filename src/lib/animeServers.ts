@@ -17,25 +17,25 @@ export const animeServers: AnimeServer[] = [
     priority: 1
   },
   {
-    id: 'vidnest',
-    name: 'Server 2 (VidNest)',
-    baseUrl: 'https://vidnest.fun/anime',
-    requiresAnilist: true,
+    id: 'megaplay-mal',
+    name: 'Server 2 (MegaPlay MAL)',
+    baseUrl: 'https://megaplay.buzz/stream/mal',
+    requiresAnilist: false,
     format: 'iframe',
     priority: 2
   },
   {
-    id: 'vidnest-animepahe',
-    name: 'Server 3 (VidNest AnimePahe)',
-    baseUrl: 'https://vidnest.fun/animepahe',
+    id: 'megaplay-ani',
+    name: 'Server 3 (MegaPlay AniList)',
+    baseUrl: 'https://megaplay.buzz/stream/ani',
     requiresAnilist: true,
     format: 'iframe',
     priority: 3
   },
   {
-    id: 'autoembed',
-    name: 'Server 4 (AutoEmbed)',
-    baseUrl: 'https://anime.autoembed.cc/embed',
+    id: '2embed',
+    name: 'Server 4 (2Embed)',
+    baseUrl: 'https://www.2embed.cc/embedtv',
     requiresAnilist: false,
     format: 'iframe',
     priority: 4
@@ -49,18 +49,18 @@ export const animeServers: AnimeServer[] = [
     priority: 5
   },
   {
-    id: 'vidsrc',
-    name: 'Server 6 (VidSrc)',
-    baseUrl: 'https://vidsrc.xyz/embed',
-    requiresAnilist: false,
+    id: 'spenembed',
+    name: 'Server 6 (SpenEmbed)',
+    baseUrl: 'https://spencerdevs.xyz/anime',
+    requiresAnilist: true,
     format: 'iframe',
     priority: 6
   },
   {
-    id: '2embed',
-    name: 'Server 7 (2Embed)',
-    baseUrl: 'https://www.2embed.cc/embed',
-    requiresAnilist: false,
+    id: 'cinetaro',
+    name: 'Server 7 (Cinetaro)',
+    baseUrl: 'https://cinextream.net/api/anime/embed/lang',
+    requiresAnilist: true,
     format: 'iframe',
     priority: 7
   }
@@ -79,29 +79,29 @@ export function getServerUrl(
     case 'animeplay':
       return `${server.baseUrl}/${id}/${episode}/${type}`;
     
-    case 'vidnest':
-      // VidNest uses AniList ID
+    case 'megaplay-mal':
+      // MegaPlay MAL ID format
+      return `${server.baseUrl}/${id}/${episode}/${type}`;
+    
+    case 'megaplay-ani':
+      // MegaPlay AniList ID format
       return `${server.baseUrl}/${effectiveId}/${episode}/${type}`;
-    
-    case 'vidnest-animepahe':
-      // VidNest AnimePahe uses AniList ID
-      return `${server.baseUrl}/${effectiveId}/${episode}/${type}`;
-    
-    case 'autoembed':
-      // AutoEmbed uses anime title (we'll use ID as fallback)
-      return `${server.baseUrl}/${id}-episode-${episode}`;
-    
-    case 'ezvid':
-      // EzVid uses TMDB ID format (we'll use ID as fallback)
-      return `${server.baseUrl}/${effectiveId}/1/${episode}`;
-    
-    case 'vidsrc':
-      // VidSrc uses TMDB ID format (we'll use ID as fallback)
-      return `${server.baseUrl}/${effectiveId}/${episode}`;
     
     case '2embed':
-      // 2Embed uses TMDB ID format (we'll use ID as fallback)
-      return `${server.baseUrl}/${effectiveId}&s=1&e=${episode}`;
+      // 2Embed TV format (anime treated as TV)
+      return `${server.baseUrl}/${id}&s=1&e=${episode}`;
+    
+    case 'ezvid':
+      // EzVid TV format (anime treated as TV)
+      return `${server.baseUrl}/${effectiveId}/1/${episode}`;
+    
+    case 'spenembed':
+      // SpenEmbed AniList format
+      return `${server.baseUrl}/${effectiveId}/${episode}`;
+    
+    case 'cinetaro':
+      // Cinetaro AniList format
+      return `${server.baseUrl}/${effectiveId}/${episode}`;
     
     default:
       return `${server.baseUrl}/${id}/${episode}/${type}`;

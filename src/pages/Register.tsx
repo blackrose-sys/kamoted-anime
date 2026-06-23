@@ -34,8 +34,7 @@ export function Register() {
         email,
         password,
         options: {
-          data: { username },
-          emailRedirectTo: `${window.location.origin}/verify`
+          data: { username }
         }
       });
       
@@ -44,26 +43,7 @@ export function Register() {
         return;
       }
 
-      // Save to profiles table for username lookup
-      if (data.user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .upsert({
-            id: data.user.id,
-            username: username,
-            email: email,
-            created_at: new Date().toISOString()
-          }, {
-            onConflict: 'id'
-          });
-
-        if (profileError) {
-          console.error('Profile save error:', profileError);
-        }
-      }
-
-      // Redirect to home regardless of confirmation status
-      // Email confirmation is disabled for now
+      // Redirect to home - no email confirmation needed
       navigate('/');
     } catch (err: any) {
       setError(err.message || 'Network error. Please try again later.');

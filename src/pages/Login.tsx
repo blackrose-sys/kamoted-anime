@@ -4,7 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 export function Login() {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -16,27 +16,13 @@ export function Login() {
     setError('');
 
     try {
-      // Query profiles table to get email from username
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('email')
-        .eq('username', username)
-        .single();
-
-      if (profileError || !profile) {
-        setError('User not found');
-        setLoading(false);
-        return;
-      }
-
-      // Sign in with the email
       const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: profile.email,
+        email,
         password
       });
       
       if (signInError) {
-        setError('Invalid username or password');
+        setError(signInError.message);
         return;
       }
       
@@ -58,12 +44,12 @@ export function Login() {
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           <div>
-            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Username</label>
+            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Email</label>
             <input 
-              type="text" 
+              type="email" 
               required
-              value={username}
-              onChange={e => setUsername(e.target.value)}
+              value={email}
+              onChange={e => setEmail(e.target.value)}
               style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '0.5rem', backgroundColor: 'var(--bg-color-secondary)', border: '1px solid var(--border-color)', color: 'white', outline: 'none' }}
               onFocus={e => e.target.style.borderColor = 'var(--accent-primary)'}
               onBlur={e => e.target.style.borderColor = 'var(--border-color)'}

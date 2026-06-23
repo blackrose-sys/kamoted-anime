@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Navigate, Link } from 'react-router-dom';
-import { Loader2, Image, Bookmark, Clock, Trash2, Play } from 'lucide-react';
+import { Loader2, Bookmark, Clock, Trash2, Play, Camera, Upload } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 export function Profile() {
@@ -41,26 +41,27 @@ export function Profile() {
       // Upload to Supabase Storage
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, avatarFile);
+        .upload(filePath, avatarFile, {
+          upsert: true
+        });
 
       if (uploadError) {
         console.error('Upload error:', uploadError);
-        // Fallback: try to get public URL without upload (if bucket doesn't exist)
-        const { data: { publicUrl } } = supabase.storage
-          .from('avatars')
-          .getPublicUrl(filePath);
-        await updateUser({ ...user, avatar_url: publicUrl });
-      } else {
-        // Get public URL
-        const { data: { publicUrl } } = supabase.storage
-          .from('avatars')
-          .getPublicUrl(filePath);
-        await updateUser({ ...user, avatar_url: publicUrl });
+        alert('Upload failed. Make sure the "avatars" bucket exists in Supabase Storage.');
+        return;
       }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      await updateUser({ ...user, avatar_url: publicUrl });
+      setAvatarFile(null);
     } catch (error) {
       console.error('Error uploading avatar:', error);
+      alert('Failed to upload avatar. Please try again.');
     } finally {
-      setAvatarFile(null);
       setUploading(false);
     }
   };
@@ -84,30 +85,80 @@ export function Profile() {
         {activeTab === 'settings' && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2rem' }}>
             <h1 style={{ fontSize: '2.5rem', fontWeight: 900, textAlign: 'center' }}>My Profile</h1>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', width: '100%' }}>
-              <div style={{ position: 'relative', width: '120px', height: '120px', borderRadius: '50%', backgroundColor: 'var(--bg-color-tertiary)', border: '4px solid var(--bg-color-secondary)', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                {uploading ? (
-                  <Loader2 className="animate-spin" size={32} color="var(--accent-primary)" />
-                ) : user.avatar_url ? (
-                  <img src={user.avatar_url} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  <span style={{ fontSize: '3rem', fontWeight: 900, color: 'var(--text-secondary)' }}>{user.username?.charAt(0).toUpperCase()}</span>
-                )}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem', width: '100%' }}>
+              <div style={{ position: 'relative', width: '150px', height: '150px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--accent-primary), #8b5cf6)', padding: '4px', boxShadow: '0 0 30px rgba(139, 92, 246, 0.3)' }}>
+                <div style={{ position: 'relative', width: '100%', height: '100%', borderRadius: '50%', backgroundColor: 'var(--bg-color-tertiary)', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                  {uploading ? (
+                    <Loader2 className="animate-spin" size={40} color="var(--accent-primary)" />
+                  ) : user.avatar_url ? (
+                    <img src={user.avatar_url} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <span style={{ fontSize: '4rem', fontWeight: 900, color: 'var(--text-secondary)' }}>{user.username?.charAt(0).toUpperCase()}</span>
+                  )}
+                </div>
+                <div style={{ position: 'absolute', bottom: '5px', right: '5px', width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'var(--accent-primary)', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', border: '3px solid var(--bg-color-secondary)', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
+                  <Camera size={20} color="black" />
+                </div>
               </div>
               
-              <div style={{ display: 'flex', gap: '0.5rem', width: '100%', maxWidth: '300px' }}>
-                <input 
-                  type="file" 
-                  accept="image/*"
-                  onChange={(e) => setAvatarFile(e.target.files?.[0] || null)}
-                  style={{ flex: 1, padding: '0.5rem 1rem', borderRadius: '0.5rem', backgroundColor: 'var(--bg-color-secondary)', border: '1px solid var(--border-color)', color: 'white', outline: 'none', fontSize: '0.875rem' }}
-                />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%', maxWidth: '350px' }}>
+                <div style={{ position: 'relative' }}>
+                  <input 
+                    type="file" 
+                    accept="image/*"
+                    onChange={(e) => setAvatarFile(e.target.files?.[0] || null)}
+                    style={{ 
+                      position: 'absolute', 
+                      width: '100%', 
+                      height: '100%', 
+                      opacity: 0, 
+                      cursor: 'pointer',
+                      zIndex: 1
+                    }}
+                  />
+                  <div style={{ 
+                    padding: '1rem 1.5rem', 
+                    borderRadius: '0.75rem', 
+                    background: 'linear-gradient(135deg, var(--bg-color-secondary), var(--bg-color-tertiary))', 
+                    border: '2px dashed var(--border-color)', 
+                    color: 'var(--text-secondary)', 
+                    textAlign: 'center',
+                    transition: 'all 0.3s ease',
+                    cursor: 'pointer'
+                  }}>
+                    <Upload size={24} style={{ marginBottom: '0.5rem', color: 'var(--accent-primary)' }} />
+                    <div style={{ fontSize: '0.875rem', fontWeight: 600 }}>
+                      {avatarFile ? avatarFile.name : 'Click to upload image'}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                      PNG, JPG up to 5MB
+                    </div>
+                  </div>
+                </div>
+                
                 <button 
                   onClick={handleAvatarChange}
                   disabled={!avatarFile || uploading}
-                  style={{ padding: '0.5rem', borderRadius: '0.5rem', backgroundColor: 'var(--accent-primary)', color: 'black', border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center' }}
+                  style={{ 
+                    padding: '1rem 2rem', 
+                    borderRadius: '0.75rem', 
+                    background: 'linear-gradient(135deg, var(--accent-primary), #8b5cf6)', 
+                    color: 'black', 
+                    border: 'none', 
+                    cursor: !avatarFile || uploading ? 'not-allowed' : 'pointer',
+                    display: 'flex', 
+                    justifyContent: 'center', 
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontWeight: 800,
+                    fontSize: '1rem',
+                    boxShadow: '0 4px 15px rgba(139, 92, 246, 0.4)',
+                    transition: 'all 0.3s ease',
+                    opacity: !avatarFile || uploading ? 0.5 : 1
+                  }}
                 >
-                  {uploading ? <Loader2 className="animate-spin" size={18} /> : <Image size={18} />}
+                  {uploading ? <Loader2 className="animate-spin" size={20} /> : <Upload size={20} />}
+                  {uploading ? 'Uploading...' : 'Upload Avatar'}
                 </button>
               </div>
             </div>

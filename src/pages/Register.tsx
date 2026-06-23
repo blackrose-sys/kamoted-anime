@@ -30,12 +30,12 @@ export function Register() {
     setError('');
 
     try {
-      const { error: signUpError } = await supabase.auth.signUp({
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: { username },
-          emailRedirectTo: undefined // Disable magic link, send OTP code instead
+          emailRedirectTo: `${window.location.origin}/verify`
         }
       });
       
@@ -43,8 +43,17 @@ export function Register() {
         setError(signUpError.message);
         return;
       }
-      
-      navigate('/verify', { state: { email } });
+
+      // Check if email confirmation is needed
+      if (data.user && !data.session) {
+        // Email confirmation required
+        navigate('/verify', { state: { email } });
+      } else if (data.session) {
+        // User is automatically logged in
+        navigate('/');
+      } else {
+        setError('Something went wrong. Please try again.');
+      }
     } catch (err: any) {
       setError(err.message || 'Network error. Please try again later.');
     } finally {

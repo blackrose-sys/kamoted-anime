@@ -22,7 +22,7 @@ export function Watch() {
   const [currentChunk, setCurrentChunk] = useState<number>(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
-  const [selectedServer, setSelectedServer] = useState<AnimeServer>(animeServers[0]);
+  const [selectedServer, setSelectedServer] = useState<AnimeServer>(animeServers[0]); // AnimePlay is primary
   const [showServerDropdown, setShowServerDropdown] = useState(false);
   const [autoNext, setAutoNext] = useState(true);
   
@@ -50,16 +50,16 @@ export function Watch() {
         })
         .catch(console.error);
 
-      // Try to fetch episodes from streaming server API first (PRIMARY SOURCE)
+      // Try to fetch episodes from AnimePlay API first (PRIMARY SOURCE)
       const fetchServerEpisodes = async () => {
         try {
-          const serverEpisodes = await fetchEpisodesFromServer(selectedServer, id, anilistId || id);
+          const serverEpisodes = await fetchEpisodesFromServer(id);
           if (serverEpisodes && serverEpisodes > 0) {
             setTotalEpisodes(serverEpisodes);
             return true;
           }
         } catch (error) {
-          console.error('Error fetching from server API:', error);
+          console.error('Error fetching from AnimePlay API:', error);
         }
         return false;
       };

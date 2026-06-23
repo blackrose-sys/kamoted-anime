@@ -10,11 +10,11 @@ export interface AnimeServer {
 export const animeServers: AnimeServer[] = [
   {
     id: 'animeplay',
-    name: 'Server 1 (AnimePlay)',
+    name: 'AnimePlay (Primary)',
     baseUrl: 'https://animeplay.cfd/stream/mal',
     requiresAnilist: false,
     format: 'iframe',
-    priority: 1
+    priority: 0
   },
   {
     id: 'megaplay-mal',
@@ -107,40 +107,11 @@ export async function convertMalToAnilist(malId: string): Promise<string | null>
 }
 
 export async function fetchEpisodesFromServer(
-  server: AnimeServer,
-  id: string,
-  anilistId?: string
+  id: string
 ): Promise<number | null> {
-  const effectiveId = anilistId || id;
-  
+  // Only use AnimePlay API for episode fetching
   try {
-    // Try to fetch episode data from the server
-    // This is a common pattern for many anime streaming APIs
-    let apiUrl = '';
-    
-    switch (server.id) {
-      case 'animeplay':
-        apiUrl = `https://animeplay.cfd/api/anime/${id}`;
-        break;
-      case 'megaplay-mal':
-        apiUrl = `https://megaplay.buzz/api/anime/${id}`;
-        break;
-      case 'megaplay-ani':
-        apiUrl = `https://megaplay.buzz/api/anime/${effectiveId}`;
-        break;
-      case 'ezvid':
-        apiUrl = `https://ezvidapi.com/api/tv/${effectiveId}`;
-        break;
-      case 'spenembed':
-        apiUrl = `https://spencerdevs.xyz/api/anime/${effectiveId}`;
-        break;
-      case 'cinetaro':
-        apiUrl = `https://cinextream.net/api/anime/${effectiveId}`;
-        break;
-      default:
-        return null;
-    }
-    
+    const apiUrl = `https://animeplay.cfd/api/anime/${id}`;
     const response = await fetch(apiUrl);
     const data = await response.json();
     
@@ -166,7 +137,7 @@ export async function fetchEpisodesFromServer(
     
     return null;
   } catch (error) {
-    console.error('Error fetching episodes from server:', error);
+    console.error('Error fetching episodes from AnimePlay API:', error);
     return null;
   }
 }

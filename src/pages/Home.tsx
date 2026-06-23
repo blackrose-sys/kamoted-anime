@@ -42,15 +42,23 @@ export function Home() {
         }
         
         // Map recently updated data to match AnimeData structure
-        const mappedRecent = (recentData.data || []).map((item: any) => ({
-          mal_id: item.entry.mal_id,
-          title: item.entry.title,
-          images: item.entry.images,
-          score: null,
-          year: null,
-          // Extract episode number from the episodes array
-          episodes: item.episodes && item.episodes.length > 0 ? parseInt(item.episodes[0].title.replace(/\D/g, ''), 10) || null : null
-        }));
+        // Filter out region-locked entries and broken placeholder images
+        const mappedRecent = (recentData.data || [])
+          .filter((item: any) => {
+            if (item.region_locked) return false;
+            const imgUrl = item.entry?.images?.jpg?.image_url || '';
+            if (imgUrl.includes('icon-banned') || imgUrl.includes('na.gif')) return false;
+            return true;
+          })
+          .map((item: any) => ({
+            mal_id: item.entry.mal_id,
+            title: item.entry.title,
+            images: item.entry.images,
+            score: null,
+            year: null,
+            // Extract episode number from the episodes array
+            episodes: item.episodes && item.episodes.length > 0 ? parseInt(item.episodes[0].title.replace(/\D/g, ''), 10) || null : null
+          }));
 
         setLatestAnime(latestData.data || []);
         setRecentlyUpdated(mappedRecent);

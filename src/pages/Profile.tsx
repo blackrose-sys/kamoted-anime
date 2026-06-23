@@ -34,34 +34,26 @@ export function Profile() {
     setUploading(true);
 
     try {
-      const fileExt = avatarFile.name.split('.').pop();
-      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-      const filePath = `avatars/${fileName}`;
-
-      // Upload to Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, avatarFile, {
-          upsert: true
-        });
-
-      if (uploadError) {
-        console.error('Upload error:', uploadError);
-        alert('Upload failed. Make sure the "avatars" bucket exists in Supabase Storage.');
-        return;
-      }
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
-
-      await updateUser({ ...user, avatar_url: publicUrl });
-      setAvatarFile(null);
+      // Convert file to base64
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64String = reader.result as string;
+        
+        // Update user with base64 image
+        await updateUser({ ...user, avatar_url: base64String });
+        setAvatarFile(null);
+        setUploading(false);
+      };
+      
+      reader.onerror = () => {
+        alert('Failed to read image file');
+        setUploading(false);
+      };
+      
+      reader.readAsDataURL(avatarFile);
     } catch (error) {
       console.error('Error uploading avatar:', error);
       alert('Failed to upload avatar. Please try again.');
-    } finally {
       setUploading(false);
     }
   };

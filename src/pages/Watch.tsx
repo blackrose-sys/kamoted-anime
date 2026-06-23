@@ -1,8 +1,9 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Search, ChevronDown, BookmarkPlus, BookmarkCheck } from 'lucide-react';
+import { ArrowLeft, Search, ChevronDown, BookmarkPlus, BookmarkCheck, Server } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { animeServers, getServerUrl, type AnimeServer } from '../lib/animeServers';
 
 export function Watch() {
   const { id } = useParams<{ id: string }>();
@@ -13,6 +14,7 @@ export function Watch() {
   const [totalEpisodes, setTotalEpisodes] = useState<number>(12);
   const [selectedEpisode, setSelectedEpisode] = useState<number>(1);
   const [type, setType] = useState<'sub' | 'dub'>('sub');
+  const [anilistId, setAnilistId] = useState<string>('');
   
   const [inWatchlist, setInWatchlist] = useState(false);
   const [watchlistLoading, setWatchlistLoading] = useState(false);
@@ -20,6 +22,8 @@ export function Watch() {
   const [currentChunk, setCurrentChunk] = useState<number>(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
+  const [selectedServer, setSelectedServer] = useState<AnimeServer>(animeServers[0]);
+  const [showServerDropdown, setShowServerDropdown] = useState(false);
   
   const CHUNK_SIZE = 100;
 
@@ -33,6 +37,13 @@ export function Watch() {
             setAnimeImage(data.data.images?.webp?.large_image_url || '');
             if (data.data.episodes) {
               setTotalEpisodes(data.data.episodes);
+            }
+            // Try to get AniList ID from the response
+            if (data.data.url) {
+              const anilistMatch = data.data.url.match(/anilist\.co\/anime\/(\d+)/);
+              if (anilistMatch) {
+                setAnilistId(anilistMatch[1]);
+              }
             }
           }
         })
@@ -142,12 +153,13 @@ export function Watch() {
             {/* Player Container */}
             <div style={{ flex: '1 1 auto', width: '100%', aspectRatio: '16/9', backgroundColor: 'var(--bg-color-secondary)', borderRadius: '1rem', overflow: 'hidden', border: '1px solid var(--border-color)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
               <iframe 
-                src={`https://animeplay.cfd/stream/mal/${id}/${selectedEpisode}/${type}`}
+                src={getServerUrl(selectedServer, id || '', selectedEpisode, type, anilistId || id)}
                 width="100%" 
                 height="100%" 
                 frameBorder="0" 
                 allowFullScreen 
                 style={{ backgroundColor: 'black' }}
+                key={`${selectedServer.id}-${selectedEpisode}-${type}`}
               />
             </div>
             
@@ -170,6 +182,74 @@ export function Watch() {
                 >
                   DUB
                 </button>
+
+                <div style={{ position: 'relative' }}>
+                  <button 
+                    onClick={() => setShowServerDropdown(!showServerDropdown)}
+                    className="btn-primary"
+                    style={{ 
+                      backgroundColor: 'var(--bg-color-secondary)', 
+                      color: 'white',
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '0.5rem',
+                      minWidth: '140px',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <Server size={16} />
+                    {selectedServer.name}
+                    <ChevronDown size={16} />
+                  </button>
+                  
+                  {showServerDropdown && (
+                    <div style={{ 
+                      position: 'absolute', 
+                      top: '100%', 
+                      left: 0, 
+                      marginTop: '0.5rem', 
+                      backgroundColor: 'var(--bg-color-secondary)', 
+                      border: '1px solid var(--border-color)', 
+                      borderRadius: '0.5rem', 
+                      padding: '0.5rem', 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      gap: '0.25rem', 
+                      zIndex: 10, 
+                      minWidth: '200px',
+                      maxHeight: '300px', 
+                      overflowY: 'auto' 
+                    }}>
+                      {animeServers.map((server) => (
+                        <button
+                          key={server.id}
+                          onClick={() => {
+                            setSelectedServer(server);
+                            setShowServerDropdown(false);
+                          }}
+                          style={{ 
+                            padding: '0.75rem 1rem', 
+                            textAlign: 'left', 
+                            backgroundColor: selectedServer.id === server.id ? 'var(--accent-primary)' : 'transparent', 
+                            color: selectedServer.id === server.id ? 'black' : 'white', 
+                            borderRadius: '0.25rem', 
+                            border: 'none', 
+                            cursor: 'pointer', 
+                            whiteSpace: 'nowrap',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem'
+                          }}
+                          onMouseOver={e => e.currentTarget.style.backgroundColor = selectedServer.id === server.id ? 'var(--accent-primary)' : 'var(--bg-color-tertiary)'}
+                          onMouseOut={e => e.currentTarget.style.backgroundColor = selectedServer.id === server.id ? 'var(--accent-primary)' : 'transparent'}
+                        >
+                          <Server size={14} />
+                          {server.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
                 <button 
                   onClick={toggleWatchlist}

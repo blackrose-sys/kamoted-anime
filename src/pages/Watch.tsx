@@ -50,23 +50,18 @@ export function Watch() {
         })
         .catch(console.error);
 
-      // Try to fetch episodes from AnimePlay API first (PRIMARY SOURCE)
-      const fetchServerEpisodes = async () => {
+      // Fetch from both AnimePlay and Jikan APIs and use the higher count
+      const fetchAllEpisodes = async () => {
+        // Fetch from AnimePlay API
+        let serverEpisodes: number | null = null;
         try {
-          const serverEpisodes = await fetchEpisodesFromServer(id);
-          if (serverEpisodes && serverEpisodes > 0) {
-            setTotalEpisodes(serverEpisodes);
-            return true;
-          }
+          serverEpisodes = await fetchEpisodesFromServer(id);
         } catch (error) {
           console.error('Error fetching from AnimePlay API:', error);
         }
-        return false;
-      };
 
-      // Fallback to Jikan API if server API fails
-      const fetchJikanEpisodes = async () => {
-        let allEpisodes: any[] = [];
+        // Fetch from Jikan API
+        let jikanEpisodes = 0;
         let page = 1;
         let hasMore = true;
         
@@ -76,7 +71,7 @@ export function Watch() {
             const data = await res.json();
             
             if (data && data.data && Array.isArray(data.data)) {
-              allEpisodes = [...allEpisodes, ...data.data];
+              jikanEpisodes += data.data.length;
               
               if (data.pagination && data.pagination.has_next_page) {
                 page++;
@@ -96,9 +91,15 @@ export function Watch() {
           }
         }
         
-        if (allEpisodes.length > 0) {
-          setTotalEpisodes(allEpisodes.length);
+        // Use the higher count between AnimePlay and Jikan
+        if (serverEpisodes && jikanEpisodes) {
+          setTotalEpisodes(Math.max(serverEpisodes, jikanEpisodes));
+        } else if (serverEpisodes) {
+          setTotalEpisodes(serverEpisodes);
+        } else if (jikanEpisodes > 0) {
+          setTotalEpisodes(jikanEpisodes);
         } else {
+          // Final fallback: use episodes field from anime data
           fetch(`https://api.jikan.moe/v4/anime/${id}?_=${cacheBuster}`)
             .then(res => res.json())
             .then(data => {
@@ -110,12 +111,7 @@ export function Watch() {
         }
       };
 
-      // Try server API first, then fallback to Jikan
-      fetchServerEpisodes().then((success) => {
-        if (!success) {
-          fetchJikanEpisodes();
-        }
-      });
+      fetchAllEpisodes();
 
       if (user) {
         supabase.from('watchlists')

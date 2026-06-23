@@ -111,7 +111,8 @@ export async function fetchEpisodesFromServer(
 ): Promise<number | null> {
   // Only use AnimePlay API for episode fetching
   try {
-    const apiUrl = `https://animeplay.cfd/api/anime/${id}`;
+    const cacheBuster = Date.now();
+    const apiUrl = `https://animeplay.cfd/api/anime/${id}?_=${cacheBuster}`;
     const response = await fetch(apiUrl);
     const data = await response.json();
     

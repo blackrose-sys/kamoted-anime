@@ -25,7 +25,7 @@ export function Watch() {
   const [selectedServer, setSelectedServer] = useState<AnimeServer>(animeServers[0]);
   const [showServerDropdown, setShowServerDropdown] = useState(false);
   
-  const CHUNK_SIZE = 100;
+  const CHUNK_SIZE = 200;
 
   useEffect(() => {
     if (id) {
@@ -38,11 +38,6 @@ export function Watch() {
             setAnimeName(data.data.title);
             setAnimeImage(data.data.images?.webp?.large_image_url || '');
             
-            // Use the episodes field from anime data as primary source (most accurate)
-            if (data.data.episodes) {
-              setTotalEpisodes(data.data.episodes);
-            }
-            
             // Try to get AniList ID from the response
             if (data.data.url) {
               const anilistMatch = data.data.url.match(/anilist\.co\/anime\/(\d+)/);
@@ -54,13 +49,13 @@ export function Watch() {
         })
         .catch(console.error);
 
-      // Fetch episodes to get accurate count with pagination (as backup)
+      // Fetch episodes to get accurate count with pagination (PRIMARY SOURCE for real-time)
       const fetchAllEpisodes = async () => {
         let allEpisodes: any[] = [];
         let page = 1;
         let hasMore = true;
         
-        while (hasMore && page <= 50) { // Increased to 50 pages for very long series (1250 episodes)
+        while (hasMore && page <= 100) { // Increased to 100 pages for very long series (2500 episodes)
           try {
             const res = await fetch(`https://api.jikan.moe/v4/anime/${id}/episodes?page=${page}&_=${cacheBuster}`);
             const data = await res.json();
@@ -88,14 +83,24 @@ export function Watch() {
           }
         }
         
-        // Only use episode count if it's higher than current (more accurate)
-        if (allEpisodes.length > 0 && allEpisodes.length > totalEpisodes) {
+        // Use episode count from pagination (most up-to-date)
+        if (allEpisodes.length > 0) {
           setTotalEpisodes(allEpisodes.length);
+        } else {
+          // Fallback: use episodes field from anime data
+          fetch(`https://api.jikan.moe/v4/anime/${id}?_=${cacheBuster}`)
+            .then(res => res.json())
+            .then(data => {
+              if (data && data.data && data.data.episodes) {
+                setTotalEpisodes(data.data.episodes);
+              }
+            })
+            .catch(console.error);
         }
       };
       
       fetchAllEpisodes().catch(() => {
-        // Fallback already handled by anime data
+        // Fallback handled above
       });
 
       if (user) {

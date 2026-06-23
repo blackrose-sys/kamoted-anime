@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Search, ChevronDown, BookmarkPlus, BookmarkCheck, Server } from 'lucide-react';
+import { ArrowLeft, Search, ChevronDown, BookmarkPlus, BookmarkCheck, Server, SkipForward, ChevronRight, ChevronLeft, ToggleLeft, ToggleRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { animeServers, getServerUrl, type AnimeServer } from '../lib/animeServers';
@@ -24,6 +24,7 @@ export function Watch() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedServer, setSelectedServer] = useState<AnimeServer>(animeServers[0]);
   const [showServerDropdown, setShowServerDropdown] = useState(false);
+  const [autoNext, setAutoNext] = useState(true);
   
   const CHUNK_SIZE = 200;
 
@@ -160,6 +161,25 @@ export function Watch() {
       }, { onConflict: 'user_id, anime_id' });
     }
   };
+
+  const handleNextEpisode = () => {
+    if (selectedEpisode < totalEpisodes) {
+      handleEpisodeClick(selectedEpisode + 1);
+    }
+  };
+
+  const handlePrevEpisode = () => {
+    if (selectedEpisode > 1) {
+      handleEpisodeClick(selectedEpisode - 1);
+    }
+  };
+
+  const handleSkipIntro = () => {
+    // Since we're using iframe, we can't directly control the video
+    // But we can add a seek forward button that would work if the player supports it
+    // For now, this is a placeholder - actual implementation would depend on the video player API
+    alert('Skip intro feature requires player API integration');
+  };
   
   const chunks = useMemo(() => {
     const numChunks = Math.ceil(totalEpisodes / CHUNK_SIZE);
@@ -211,6 +231,87 @@ export function Watch() {
             {/* Controls */}
             <div style={{ flex: '1 1 300px' }}>
               <h1 style={{ fontSize: '2rem', fontWeight: 900, marginBottom: '1rem', lineHeight: 1.2 }}>{animeName}</h1>
+              
+              {/* Episode Navigation */}
+              <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <button 
+                  onClick={handlePrevEpisode}
+                  disabled={selectedEpisode <= 1}
+                  className="btn-primary"
+                  style={{ 
+                    opacity: selectedEpisode <= 1 ? 0.3 : 1,
+                    cursor: selectedEpisode <= 1 ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.75rem 1.25rem'
+                  }}
+                >
+                  <ChevronLeft size={18} />
+                  Prev
+                </button>
+                
+                <div style={{ 
+                  padding: '0.75rem 1.5rem', 
+                  backgroundColor: 'var(--bg-color-secondary)', 
+                  border: '1px solid var(--border-color)', 
+                  borderRadius: '0.5rem',
+                  fontWeight: 700,
+                  minWidth: '120px',
+                  textAlign: 'center'
+                }}>
+                  EP {selectedEpisode} / {totalEpisodes}
+                </div>
+                
+                <button 
+                  onClick={handleNextEpisode}
+                  disabled={selectedEpisode >= totalEpisodes}
+                  className="btn-primary"
+                  style={{ 
+                    opacity: selectedEpisode >= totalEpisodes ? 0.3 : 1,
+                    cursor: selectedEpisode >= totalEpisodes ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.75rem 1.25rem'
+                  }}
+                >
+                  Next
+                  <ChevronRight size={18} />
+                </button>
+
+                <button 
+                  onClick={handleSkipIntro}
+                  className="btn-primary"
+                  style={{ 
+                    backgroundColor: 'var(--bg-color-secondary)', 
+                    color: 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.75rem 1.25rem'
+                  }}
+                >
+                  <SkipForward size={18} />
+                  Skip Intro
+                </button>
+
+                <button 
+                  onClick={() => setAutoNext(!autoNext)}
+                  className="btn-primary"
+                  style={{ 
+                    backgroundColor: autoNext ? 'var(--accent-primary)' : 'var(--bg-color-secondary)', 
+                    color: autoNext ? 'black' : 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.75rem 1.25rem'
+                  }}
+                >
+                  {autoNext ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
+                  Auto Next
+                </button>
+              </div>
               
               <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
                 <button 

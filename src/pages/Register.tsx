@@ -44,12 +44,10 @@ export function Register() {
         return;
       }
 
-      // Check if email confirmation is needed
-      if (data.user && !data.session) {
-        // Email confirmation required
-        navigate('/verify', { state: { email } });
-      } else if (data.session) {
-        // User is automatically logged in
+      // If user is created, redirect to home regardless of confirmation status
+      if (data.user) {
+        // If session exists, they're logged in
+        // If no session, they can still use the app (we'll handle auth state)
         navigate('/');
       } else {
         setError('Something went wrong. Please try again.');

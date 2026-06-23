@@ -35,9 +35,6 @@ export function Watch() {
           if (data && data.data) {
             setAnimeName(data.data.title);
             setAnimeImage(data.data.images?.webp?.large_image_url || '');
-            if (data.data.episodes) {
-              setTotalEpisodes(data.data.episodes);
-            }
             // Try to get AniList ID from the response
             if (data.data.url) {
               const anilistMatch = data.data.url.match(/anilist\.co\/anime\/(\d+)/);
@@ -49,14 +46,56 @@ export function Watch() {
         })
         .catch(console.error);
 
-      fetch(`https://api.jikan.moe/v4/anime/${id}/episodes`)
-        .then(res => res.json())
-        .then(data => {
-          if (data && data.pagination && data.pagination.items && data.pagination.items.total) {
-            setTotalEpisodes(data.pagination.items.total);
+      // Fetch episodes to get accurate count with pagination
+      const fetchAllEpisodes = async () => {
+        let allEpisodes: any[] = [];
+        let page = 1;
+        let hasMore = true;
+        
+        while (hasMore && page <= 10) { // Limit to 10 pages to avoid infinite loops
+          try {
+            const res = await fetch(`https://api.jikan.moe/v4/anime/${id}/episodes?page=${page}`);
+            const data = await res.json();
+            
+            if (data && data.data && Array.isArray(data.data)) {
+              allEpisodes = [...allEpisodes, ...data.data];
+              
+              // Check if there are more pages
+              if (data.pagination && data.pagination.has_next_page) {
+                page++;
+              } else {
+                hasMore = false;
+              }
+            } else {
+              hasMore = false;
+            }
+            
+            // Add delay to respect rate limits
+            if (hasMore) {
+              await new Promise(resolve => setTimeout(resolve, 400));
+            }
+          } catch (error) {
+            console.error('Error fetching episodes:', error);
+            hasMore = false;
           }
-        })
-        .catch(console.error);
+        }
+        
+        if (allEpisodes.length > 0) {
+          setTotalEpisodes(allEpisodes.length);
+        }
+      };
+      
+      fetchAllEpisodes().catch(() => {
+        // Fallback: use episodes field from anime data
+        fetch(`https://api.jikan.moe/v4/anime/${id}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data && data.data && data.data.episodes) {
+              setTotalEpisodes(data.data.episodes);
+            }
+          })
+          .catch(console.error);
+      });
 
       if (user) {
         supabase.from('watchlists')

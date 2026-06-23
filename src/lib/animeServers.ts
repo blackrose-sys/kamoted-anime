@@ -33,36 +33,28 @@ export const animeServers: AnimeServer[] = [
     priority: 3
   },
   {
-    id: '2embed',
-    name: 'Server 4 (2Embed)',
-    baseUrl: 'https://www.2embed.cc/embedtv',
+    id: 'ezvid',
+    name: 'Server 4 (EzVid)',
+    baseUrl: 'https://ezvidapi.com/embed/tv',
     requiresAnilist: false,
     format: 'iframe',
     priority: 4
   },
   {
-    id: 'ezvid',
-    name: 'Server 5 (EzVid)',
-    baseUrl: 'https://ezvidapi.com/embed/tv',
-    requiresAnilist: false,
+    id: 'spenembed',
+    name: 'Server 5 (SpenEmbed)',
+    baseUrl: 'https://spencerdevs.xyz/anime',
+    requiresAnilist: true,
     format: 'iframe',
     priority: 5
   },
   {
-    id: 'spenembed',
-    name: 'Server 6 (SpenEmbed)',
-    baseUrl: 'https://spencerdevs.xyz/anime',
-    requiresAnilist: true,
-    format: 'iframe',
-    priority: 6
-  },
-  {
     id: 'cinetaro',
-    name: 'Server 7 (Cinetaro)',
+    name: 'Server 6 (Cinetaro)',
     baseUrl: 'https://cinextream.net/api/anime/embed/lang',
     requiresAnilist: true,
     format: 'iframe',
-    priority: 7
+    priority: 6
   }
 ];
 
@@ -86,10 +78,6 @@ export function getServerUrl(
     case 'megaplay-ani':
       // MegaPlay AniList ID format
       return `${server.baseUrl}/${effectiveId}/${episode}/${type}`;
-    
-    case '2embed':
-      // 2Embed TV format (anime treated as TV)
-      return `${server.baseUrl}/${id}&s=1&e=${episode}`;
     
     case 'ezvid':
       // EzVid TV format (anime treated as TV)

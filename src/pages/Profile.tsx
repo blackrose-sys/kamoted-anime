@@ -11,8 +11,12 @@ export function Profile() {
   const [activeTab, setActiveTab] = useState<'settings' | 'watchlist' | 'history'>('settings');
   const [showCropModal, setShowCropModal] = useState(false);
   const [imagePreview, setImagePreview] = useState<string>('');
-  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [croppedPreview, setCroppedPreview] = useState<string>('');
   const [zoom, setZoom] = useState(1);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const imageRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
   const [watchlist, setWatchlist] = useState<any[]>([]);
@@ -60,25 +64,35 @@ export function Profile() {
       image.src = imagePreview;
       
       image.onload = () => {
-        canvas.width = 300;
-        canvas.height = 300;
+        const cropSize = 300;
+        canvas.width = cropSize;
+        canvas.height = cropSize;
         
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
-        const scale = Math.max(canvas.width / image.width, canvas.height / image.height) * zoom;
-        const x = (canvas.width - image.width * scale) / 2 + crop.x;
-        const y = (canvas.height - image.height * scale) / 2 + crop.y;
+        const scale = zoom;
         
-        ctx.drawImage(image, x, y, image.width * scale, image.height * scale);
+        // Calculate source crop area
+        const sourceX = (-position.x / scale);
+        const sourceY = (-position.y / scale);
+        const sourceWidth = cropSize / scale;
+        const sourceHeight = cropSize / scale;
+        
+        ctx.drawImage(
+          image,
+          sourceX, sourceY, sourceWidth, sourceHeight,
+          0, 0, cropSize, cropSize
+        );
         
         const croppedImage = canvas.toDataURL('image/jpeg', 0.9);
         updateUser({ ...user, avatar_url: croppedImage });
         setShowCropModal(false);
         setAvatarFile(null);
         setImagePreview('');
+        setCroppedPreview('');
         setZoom(1);
-        setCrop({ x: 0, y: 0 });
+        setPosition({ x: 0, y: 0 });
         setUploading(false);
       };
     } catch (error) {
@@ -86,6 +100,63 @@ export function Profile() {
       alert('Failed to crop image');
       setUploading(false);
     }
+  };
+
+  const updateCroppedPreview = () => {
+    if (!canvasRef.current || !imagePreview) return;
+    
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const image = new Image();
+    image.src = imagePreview;
+    
+    image.onload = () => {
+      const cropSize = 150; // Smaller preview
+      canvas.width = cropSize;
+      canvas.height = cropSize;
+      
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      const scale = zoom;
+      const sourceX = (-position.x / scale);
+      const sourceY = (-position.y / scale);
+      const sourceWidth = cropSize / scale;
+      const sourceHeight = cropSize / scale;
+      
+      ctx.drawImage(
+        image,
+        sourceX, sourceY, sourceWidth, sourceHeight,
+        0, 0, cropSize, cropSize
+      );
+      
+      setCroppedPreview(canvas.toDataURL('image/jpeg', 0.9));
+    };
+  };
+
+  useEffect(() => {
+    if (showCropModal && imagePreview) {
+      updateCroppedPreview();
+    }
+  }, [zoom, position, showCropModal, imagePreview]);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setIsDragging(true);
+    setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    setPosition({
+      x: e.clientX - dragStart.x,
+      y: e.clientY - dragStart.y
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
   };
 
   const removeFromWatchlist = async (animeId: number) => {
@@ -265,7 +336,7 @@ export function Profile() {
           left: 0, 
           right: 0, 
           bottom: 0, 
-          backgroundColor: 'rgba(0,0,0,0.9)', 
+          backgroundColor: 'rgba(0,0,0,0.95)', 
           zIndex: 1000, 
           display: 'flex', 
           flexDirection: 'column', 
@@ -277,82 +348,148 @@ export function Profile() {
             backgroundColor: 'var(--bg-color-secondary)', 
             borderRadius: '1rem', 
             padding: '2rem', 
-            maxWidth: '500px', 
+            maxWidth: '700px', 
             width: '100%',
             border: '1px solid var(--border-color)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 900 }}>Crop Your Image</h3>
+              <h3 style={{ fontSize: '1.5rem', fontWeight: 900 }}>Crop Your Image</h3>
               <button 
                 onClick={() => {
                   setShowCropModal(false);
                   setAvatarFile(null);
                   setImagePreview('');
+                  setCroppedPreview('');
                 }}
                 style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}
               >
-                <X size={24} />
+                <X size={28} />
               </button>
             </div>
 
-            <div style={{ 
-              position: 'relative', 
-              width: '100%', 
-              height: '300px', 
-              backgroundColor: '#000', 
-              borderRadius: '0.5rem', 
-              overflow: 'hidden',
-              marginBottom: '1.5rem'
-            }}>
-              <img 
-                src={imagePreview} 
-                alt="Preview" 
-                style={{ 
+            <div style={{ display: 'flex', gap: '2rem', marginBottom: '1.5rem' }}>
+              {/* Image Editor */}
+              <div style={{ flex: 2 }}>
+                <div style={{ 
+                  position: 'relative', 
                   width: '100%', 
-                  height: '100%', 
-                  objectFit: 'contain',
-                  transform: `scale(${zoom})`,
-                  transformOrigin: 'center'
+                  height: '350px', 
+                  backgroundColor: '#000', 
+                  borderRadius: '0.75rem', 
+                  overflow: 'hidden',
+                  cursor: isDragging ? 'grabbing' : 'grab',
+                  border: '2px solid var(--border-color)'
                 }}
-              />
-            </div>
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
+                >
+                  <img 
+                    src={imagePreview} 
+                    alt="Preview" 
+                    ref={imageRef}
+                    style={{ 
+                      width: '100%', 
+                      height: '100%', 
+                      objectFit: 'contain',
+                      transform: `translate(${position.x}px, ${position.y}px) scale(${zoom})`,
+                      transformOrigin: 'center',
+                      pointerEvents: 'none'
+                    }}
+                  />
+                  
+                  {/* Crop overlay */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    width: '200px',
+                    height: '200px',
+                    border: '3px solid var(--accent-primary)',
+                    borderRadius: '50%',
+                    pointerEvents: 'none',
+                    boxShadow: '0 0 0 9999px rgba(0,0,0,0.5)'
+                  }} />
+                </div>
 
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', alignItems: 'center' }}>
-              <button 
-                onClick={() => setZoom(Math.max(0.5, zoom - 0.1))}
-                style={{ 
-                  padding: '0.5rem', 
-                  borderRadius: '0.5rem', 
-                  backgroundColor: 'var(--bg-color-tertiary)', 
-                  border: '1px solid var(--border-color)', 
-                  color: 'white', 
-                  cursor: 'pointer' 
-                }}
-              >
-                <ZoomOut size={20} />
-              </button>
-              <input 
-                type="range" 
-                min="0.5" 
-                max="3" 
-                step="0.1" 
-                value={zoom}
-                onChange={(e) => setZoom(parseFloat(e.target.value))}
-                style={{ flex: 1 }}
-              />
-              <button 
-                onClick={() => setZoom(Math.min(3, zoom + 0.1))}
-                style={{ 
-                  padding: '0.5rem', 
-                  borderRadius: '0.5rem', 
-                  backgroundColor: 'var(--bg-color-tertiary)', 
-                  border: '1px solid var(--border-color)', 
-                  color: 'white', 
-                  cursor: 'pointer' 
-                }}
-              >
-                <ZoomIn size={20} />
-              </button>
+                <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', alignItems: 'center' }}>
+                  <button 
+                    onClick={() => setZoom(Math.max(0.5, zoom - 0.1))}
+                    style={{ 
+                      padding: '0.5rem', 
+                      borderRadius: '0.5rem', 
+                      backgroundColor: 'var(--bg-color-tertiary)', 
+                      border: '1px solid var(--border-color)', 
+                      color: 'white', 
+                      cursor: 'pointer' 
+                    }}
+                  >
+                    <ZoomOut size={20} />
+                  </button>
+                  <input 
+                    type="range" 
+                    min="0.5" 
+                    max="3" 
+                    step="0.05" 
+                    value={zoom}
+                    onChange={(e) => setZoom(parseFloat(e.target.value))}
+                    style={{ flex: 1 }}
+                  />
+                  <button 
+                    onClick={() => setZoom(Math.min(3, zoom + 0.1))}
+                    style={{ 
+                      padding: '0.5rem', 
+                      borderRadius: '0.5rem', 
+                      backgroundColor: 'var(--bg-color-tertiary)', 
+                      border: '1px solid var(--border-color)', 
+                      color: 'white', 
+                      cursor: 'pointer' 
+                    }}
+                  >
+                    <ZoomIn size={20} />
+                  </button>
+                  <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', minWidth: '50px', textAlign: 'center' }}>
+                    {Math.round(zoom * 100)}%
+                  </span>
+                </div>
+              </div>
+
+              {/* Preview */}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
+                  Preview
+                </div>
+                <div style={{ 
+                  width: '150px', 
+                  height: '150px', 
+                  borderRadius: '50%', 
+                  overflow: 'hidden',
+                  border: '3px solid var(--accent-primary)',
+                  boxShadow: '0 0 20px rgba(139, 92, 246, 0.3)'
+                }}>
+                  {croppedPreview ? (
+                    <img src={croppedPreview} alt="Cropped preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <div style={{ 
+                      width: '100%', 
+                      height: '100%', 
+                      backgroundColor: 'var(--bg-color-tertiary)', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      color: 'var(--text-secondary)',
+                      fontSize: '0.75rem'
+                    }}>
+                      Loading...
+                    </div>
+                  )}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.5rem', textAlign: 'center' }}>
+                  150x150
+                </div>
+              </div>
             </div>
 
             <div style={{ display: 'flex', gap: '1rem' }}>
@@ -361,16 +498,18 @@ export function Profile() {
                   setShowCropModal(false);
                   setAvatarFile(null);
                   setImagePreview('');
+                  setCroppedPreview('');
                 }}
                 style={{ 
                   flex: 1, 
                   padding: '1rem', 
-                  borderRadius: '0.5rem', 
+                  borderRadius: '0.75rem', 
                   backgroundColor: 'var(--bg-color-tertiary)', 
                   border: '1px solid var(--border-color)', 
                   color: 'white', 
                   cursor: 'pointer',
-                  fontWeight: 600
+                  fontWeight: 700,
+                  fontSize: '1rem'
                 }}
               >
                 Cancel
@@ -381,16 +520,19 @@ export function Profile() {
                 style={{ 
                   flex: 1, 
                   padding: '1rem', 
-                  borderRadius: '0.5rem', 
-                  backgroundColor: 'var(--accent-primary)', 
+                  borderRadius: '0.75rem', 
+                  background: 'linear-gradient(135deg, var(--accent-primary), #8b5cf6)', 
                   border: 'none', 
                   color: 'black', 
                   cursor: uploading ? 'not-allowed' : 'pointer',
                   fontWeight: 800,
+                  fontSize: '1rem',
                   display: 'flex',
                   justifyContent: 'center',
                   alignItems: 'center',
-                  gap: '0.5rem'
+                  gap: '0.5rem',
+                  boxShadow: '0 4px 15px rgba(139, 92, 246, 0.4)',
+                  opacity: uploading ? 0.5 : 1
                 }}
               >
                 {uploading ? <Loader2 className="animate-spin" size={20} /> : 'Apply & Upload'}

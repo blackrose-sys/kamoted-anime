@@ -37,6 +37,12 @@ export function Watch() {
           if (data && data.data) {
             setAnimeName(data.data.title);
             setAnimeImage(data.data.images?.webp?.large_image_url || '');
+            
+            // Use the episodes field from anime data as primary source (most accurate)
+            if (data.data.episodes) {
+              setTotalEpisodes(data.data.episodes);
+            }
+            
             // Try to get AniList ID from the response
             if (data.data.url) {
               const anilistMatch = data.data.url.match(/anilist\.co\/anime\/(\d+)/);
@@ -48,13 +54,13 @@ export function Watch() {
         })
         .catch(console.error);
 
-      // Fetch episodes to get accurate count with pagination
+      // Fetch episodes to get accurate count with pagination (as backup)
       const fetchAllEpisodes = async () => {
         let allEpisodes: any[] = [];
         let page = 1;
         let hasMore = true;
         
-        while (hasMore && page <= 20) { // Increased to 20 pages for longer series
+        while (hasMore && page <= 50) { // Increased to 50 pages for very long series (1250 episodes)
           try {
             const res = await fetch(`https://api.jikan.moe/v4/anime/${id}/episodes?page=${page}&_=${cacheBuster}`);
             const data = await res.json();
@@ -82,21 +88,14 @@ export function Watch() {
           }
         }
         
-        if (allEpisodes.length > 0) {
+        // Only use episode count if it's higher than current (more accurate)
+        if (allEpisodes.length > 0 && allEpisodes.length > totalEpisodes) {
           setTotalEpisodes(allEpisodes.length);
         }
       };
       
       fetchAllEpisodes().catch(() => {
-        // Fallback: use episodes field from anime data
-        fetch(`https://api.jikan.moe/v4/anime/${id}?_=${cacheBuster}`)
-          .then(res => res.json())
-          .then(data => {
-            if (data && data.data && data.data.episodes) {
-              setTotalEpisodes(data.data.episodes);
-            }
-          })
-          .catch(console.error);
+        // Fallback already handled by anime data
       });
 
       if (user) {

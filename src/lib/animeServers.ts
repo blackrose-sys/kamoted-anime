@@ -105,3 +105,68 @@ export async function convertMalToAnilist(malId: string): Promise<string | null>
     return null;
   }
 }
+
+export async function fetchEpisodesFromServer(
+  server: AnimeServer,
+  id: string,
+  anilistId?: string
+): Promise<number | null> {
+  const effectiveId = anilistId || id;
+  
+  try {
+    // Try to fetch episode data from the server
+    // This is a common pattern for many anime streaming APIs
+    let apiUrl = '';
+    
+    switch (server.id) {
+      case 'animeplay':
+        apiUrl = `https://animeplay.cfd/api/anime/${id}`;
+        break;
+      case 'megaplay-mal':
+        apiUrl = `https://megaplay.buzz/api/anime/${id}`;
+        break;
+      case 'megaplay-ani':
+        apiUrl = `https://megaplay.buzz/api/anime/${effectiveId}`;
+        break;
+      case 'ezvid':
+        apiUrl = `https://ezvidapi.com/api/tv/${effectiveId}`;
+        break;
+      case 'spenembed':
+        apiUrl = `https://spencerdevs.xyz/api/anime/${effectiveId}`;
+        break;
+      case 'cinetaro':
+        apiUrl = `https://cinextream.net/api/anime/${effectiveId}`;
+        break;
+      default:
+        return null;
+    }
+    
+    const response = await fetch(apiUrl);
+    const data = await response.json();
+    
+    // Try to extract episode count from various response formats
+    if (data?.episodes) {
+      return data.episodes;
+    }
+    if (data?.totalEpisodes) {
+      return data.totalEpisodes;
+    }
+    if (data?.data?.episodes) {
+      return data.data.episodes;
+    }
+    if (data?.data?.total_episodes) {
+      return data.data.total_episodes;
+    }
+    if (Array.isArray(data?.episodes)) {
+      return data.episodes.length;
+    }
+    if (Array.isArray(data?.data)) {
+      return data.data.length;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error fetching episodes from server:', error);
+    return null;
+  }
+}

@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Search, ChevronDown, BookmarkPlus, BookmarkCheck, Server, SkipForward, ChevronRight, ChevronLeft, ToggleLeft, ToggleRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { animeServers, getServerUrl, type AnimeServer } from '../lib/animeServers';
+import { animeServers, getServerUrl, fetchEpisodesFromServer, type AnimeServer } from '../lib/animeServers';
 
 export function Watch() {
   const { id } = useParams<{ id: string }>();
@@ -50,13 +50,27 @@ export function Watch() {
         })
         .catch(console.error);
 
-      // Fetch episodes to get accurate count with pagination (PRIMARY SOURCE for real-time)
-      const fetchAllEpisodes = async () => {
+      // Try to fetch episodes from streaming server API first (PRIMARY SOURCE)
+      const fetchServerEpisodes = async () => {
+        try {
+          const serverEpisodes = await fetchEpisodesFromServer(selectedServer, id, anilistId || id);
+          if (serverEpisodes && serverEpisodes > 0) {
+            setTotalEpisodes(serverEpisodes);
+            return true;
+          }
+        } catch (error) {
+          console.error('Error fetching from server API:', error);
+        }
+        return false;
+      };
+
+      // Fallback to Jikan API if server API fails
+      const fetchJikanEpisodes = async () => {
         let allEpisodes: any[] = [];
         let page = 1;
         let hasMore = true;
         
-        while (hasMore && page <= 100) { // Increased to 100 pages for very long series (2500 episodes)
+        while (hasMore && page <= 100) {
           try {
             const res = await fetch(`https://api.jikan.moe/v4/anime/${id}/episodes?page=${page}&_=${cacheBuster}`);
             const data = await res.json();
@@ -64,7 +78,6 @@ export function Watch() {
             if (data && data.data && Array.isArray(data.data)) {
               allEpisodes = [...allEpisodes, ...data.data];
               
-              // Check if there are more pages
               if (data.pagination && data.pagination.has_next_page) {
                 page++;
               } else {
@@ -74,7 +87,6 @@ export function Watch() {
               hasMore = false;
             }
             
-            // Add delay to respect rate limits
             if (hasMore) {
               await new Promise(resolve => setTimeout(resolve, 400));
             }
@@ -84,11 +96,9 @@ export function Watch() {
           }
         }
         
-        // Use episode count from pagination (most up-to-date)
         if (allEpisodes.length > 0) {
           setTotalEpisodes(allEpisodes.length);
         } else {
-          // Fallback: use episodes field from anime data
           fetch(`https://api.jikan.moe/v4/anime/${id}?_=${cacheBuster}`)
             .then(res => res.json())
             .then(data => {
@@ -99,9 +109,12 @@ export function Watch() {
             .catch(console.error);
         }
       };
-      
-      fetchAllEpisodes().catch(() => {
-        // Fallback handled above
+
+      // Try server API first, then fallback to Jikan
+      fetchServerEpisodes().then((success) => {
+        if (!success) {
+          fetchJikanEpisodes();
+        }
       });
 
       if (user) {

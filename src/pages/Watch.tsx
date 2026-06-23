@@ -29,7 +29,9 @@ export function Watch() {
 
   useEffect(() => {
     if (id) {
-      fetch(`https://api.jikan.moe/v4/anime/${id}`)
+      const cacheBuster = Date.now();
+      
+      fetch(`https://api.jikan.moe/v4/anime/${id}?_=${cacheBuster}`)
         .then(res => res.json())
         .then(data => {
           if (data && data.data) {
@@ -52,9 +54,9 @@ export function Watch() {
         let page = 1;
         let hasMore = true;
         
-        while (hasMore && page <= 10) { // Limit to 10 pages to avoid infinite loops
+        while (hasMore && page <= 20) { // Increased to 20 pages for longer series
           try {
-            const res = await fetch(`https://api.jikan.moe/v4/anime/${id}/episodes?page=${page}`);
+            const res = await fetch(`https://api.jikan.moe/v4/anime/${id}/episodes?page=${page}&_=${cacheBuster}`);
             const data = await res.json();
             
             if (data && data.data && Array.isArray(data.data)) {
@@ -87,7 +89,7 @@ export function Watch() {
       
       fetchAllEpisodes().catch(() => {
         // Fallback: use episodes field from anime data
-        fetch(`https://api.jikan.moe/v4/anime/${id}`)
+        fetch(`https://api.jikan.moe/v4/anime/${id}?_=${cacheBuster}`)
           .then(res => res.json())
           .then(data => {
             if (data && data.data && data.data.episodes) {

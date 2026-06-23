@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Navigate, Link } from 'react-router-dom';
-import { Loader2, Bookmark, Clock, Trash2, Play, Camera, Upload } from 'lucide-react';
+import { Loader2, Bookmark, Clock, Trash2, Play, Camera, Upload, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 export function Profile() {
@@ -9,6 +9,11 @@ export function Profile() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [activeTab, setActiveTab] = useState<'settings' | 'watchlist' | 'history'>('settings');
+  const [showCropModal, setShowCropModal] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string>('');
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   
   const [watchlist, setWatchlist] = useState<any[]>([]);
   const [history, setHistory] = useState<any[]>([]);
@@ -31,29 +36,54 @@ export function Profile() {
 
   const handleAvatarChange = async () => {
     if (!avatarFile) return;
-    setUploading(true);
+    
+    // Show crop modal instead of direct upload
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+      setShowCropModal(true);
+    };
+    reader.readAsDataURL(avatarFile);
+  };
 
+  const handleCropComplete = async () => {
+    if (!canvasRef.current || !imagePreview) return;
+    
+    setUploading(true);
+    
     try {
-      // Convert file to base64
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64String = reader.result as string;
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const image = new Image();
+      image.src = imagePreview;
+      
+      image.onload = () => {
+        canvas.width = 300;
+        canvas.height = 300;
         
-        // Update user with base64 image
-        await updateUser({ ...user, avatar_url: base64String });
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        const scale = Math.max(canvas.width / image.width, canvas.height / image.height) * zoom;
+        const x = (canvas.width - image.width * scale) / 2 + crop.x;
+        const y = (canvas.height - image.height * scale) / 2 + crop.y;
+        
+        ctx.drawImage(image, x, y, image.width * scale, image.height * scale);
+        
+        const croppedImage = canvas.toDataURL('image/jpeg', 0.9);
+        updateUser({ ...user, avatar_url: croppedImage });
+        setShowCropModal(false);
         setAvatarFile(null);
+        setImagePreview('');
+        setZoom(1);
+        setCrop({ x: 0, y: 0 });
         setUploading(false);
       };
-      
-      reader.onerror = () => {
-        alert('Failed to read image file');
-        setUploading(false);
-      };
-      
-      reader.readAsDataURL(avatarFile);
     } catch (error) {
-      console.error('Error uploading avatar:', error);
-      alert('Failed to upload avatar. Please try again.');
+      console.error('Error cropping image:', error);
+      alert('Failed to crop image');
       setUploading(false);
     }
   };
@@ -226,6 +256,151 @@ export function Profile() {
         )}
 
       </div>
+
+      {/* Crop Modal */}
+      {showCropModal && (
+        <div style={{ 
+          position: 'fixed', 
+          top: 0, 
+          left: 0, 
+          right: 0, 
+          bottom: 0, 
+          backgroundColor: 'rgba(0,0,0,0.9)', 
+          zIndex: 1000, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          padding: '2rem'
+        }}>
+          <div style={{ 
+            backgroundColor: 'var(--bg-color-secondary)', 
+            borderRadius: '1rem', 
+            padding: '2rem', 
+            maxWidth: '500px', 
+            width: '100%',
+            border: '1px solid var(--border-color)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 900 }}>Crop Your Image</h3>
+              <button 
+                onClick={() => {
+                  setShowCropModal(false);
+                  setAvatarFile(null);
+                  setImagePreview('');
+                }}
+                style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div style={{ 
+              position: 'relative', 
+              width: '100%', 
+              height: '300px', 
+              backgroundColor: '#000', 
+              borderRadius: '0.5rem', 
+              overflow: 'hidden',
+              marginBottom: '1.5rem'
+            }}>
+              <img 
+                src={imagePreview} 
+                alt="Preview" 
+                style={{ 
+                  width: '100%', 
+                  height: '100%', 
+                  objectFit: 'contain',
+                  transform: `scale(${zoom})`,
+                  transformOrigin: 'center'
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', alignItems: 'center' }}>
+              <button 
+                onClick={() => setZoom(Math.max(0.5, zoom - 0.1))}
+                style={{ 
+                  padding: '0.5rem', 
+                  borderRadius: '0.5rem', 
+                  backgroundColor: 'var(--bg-color-tertiary)', 
+                  border: '1px solid var(--border-color)', 
+                  color: 'white', 
+                  cursor: 'pointer' 
+                }}
+              >
+                <ZoomOut size={20} />
+              </button>
+              <input 
+                type="range" 
+                min="0.5" 
+                max="3" 
+                step="0.1" 
+                value={zoom}
+                onChange={(e) => setZoom(parseFloat(e.target.value))}
+                style={{ flex: 1 }}
+              />
+              <button 
+                onClick={() => setZoom(Math.min(3, zoom + 0.1))}
+                style={{ 
+                  padding: '0.5rem', 
+                  borderRadius: '0.5rem', 
+                  backgroundColor: 'var(--bg-color-tertiary)', 
+                  border: '1px solid var(--border-color)', 
+                  color: 'white', 
+                  cursor: 'pointer' 
+                }}
+              >
+                <ZoomIn size={20} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button 
+                onClick={() => {
+                  setShowCropModal(false);
+                  setAvatarFile(null);
+                  setImagePreview('');
+                }}
+                style={{ 
+                  flex: 1, 
+                  padding: '1rem', 
+                  borderRadius: '0.5rem', 
+                  backgroundColor: 'var(--bg-color-tertiary)', 
+                  border: '1px solid var(--border-color)', 
+                  color: 'white', 
+                  cursor: 'pointer',
+                  fontWeight: 600
+                }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleCropComplete}
+                disabled={uploading}
+                style={{ 
+                  flex: 1, 
+                  padding: '1rem', 
+                  borderRadius: '0.5rem', 
+                  backgroundColor: 'var(--accent-primary)', 
+                  border: 'none', 
+                  color: 'black', 
+                  cursor: uploading ? 'not-allowed' : 'pointer',
+                  fontWeight: 800,
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                {uploading ? <Loader2 className="animate-spin" size={20} /> : 'Apply & Upload'}
+              </button>
+            </div>
+
+            <canvas ref={canvasRef} style={{ display: 'none' }} />
+          </div>
+        </div>
+      )}
     </main>
   );
 }

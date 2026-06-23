@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase';
 
 export function Profile() {
   const { user, updateUser } = useAuth();
-  const [avatarUrlInput, setAvatarUrlInput] = useState('');
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [activeTab, setActiveTab] = useState<'settings' | 'watchlist' | 'history'>('settings');
   
@@ -30,11 +30,39 @@ export function Profile() {
   }
 
   const handleAvatarChange = async () => {
-    if (!avatarUrlInput) return;
+    if (!avatarFile) return;
     setUploading(true);
-    await updateUser({ ...user, avatar_url: avatarUrlInput });
-    setAvatarUrlInput('');
-    setUploading(false);
+
+    try {
+      const fileExt = avatarFile.name.split('.').pop();
+      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+
+      // Upload to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, avatarFile);
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        // Fallback: try to get public URL without upload (if bucket doesn't exist)
+        const { data: { publicUrl } } = supabase.storage
+          .from('avatars')
+          .getPublicUrl(filePath);
+        await updateUser({ ...user, avatar_url: publicUrl });
+      } else {
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('avatars')
+          .getPublicUrl(filePath);
+        await updateUser({ ...user, avatar_url: publicUrl });
+      }
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+    } finally {
+      setAvatarFile(null);
+      setUploading(false);
+    }
   };
 
   const removeFromWatchlist = async (animeId: number) => {
@@ -69,18 +97,17 @@ export function Profile() {
               
               <div style={{ display: 'flex', gap: '0.5rem', width: '100%', maxWidth: '300px' }}>
                 <input 
-                  type="text" 
-                  placeholder="Paste Image URL..." 
-                  value={avatarUrlInput}
-                  onChange={(e) => setAvatarUrlInput(e.target.value)}
+                  type="file" 
+                  accept="image/*"
+                  onChange={(e) => setAvatarFile(e.target.files?.[0] || null)}
                   style={{ flex: 1, padding: '0.5rem 1rem', borderRadius: '0.5rem', backgroundColor: 'var(--bg-color-secondary)', border: '1px solid var(--border-color)', color: 'white', outline: 'none', fontSize: '0.875rem' }}
                 />
                 <button 
                   onClick={handleAvatarChange}
-                  disabled={!avatarUrlInput || uploading}
+                  disabled={!avatarFile || uploading}
                   style={{ padding: '0.5rem', borderRadius: '0.5rem', backgroundColor: 'var(--accent-primary)', color: 'black', border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center' }}
                 >
-                  <Image size={18} />
+                  {uploading ? <Loader2 className="animate-spin" size={18} /> : <Image size={18} />}
                 </button>
               </div>
             </div>

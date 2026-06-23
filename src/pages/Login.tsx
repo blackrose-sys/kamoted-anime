@@ -4,7 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 export function Login() {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -16,8 +16,11 @@ export function Login() {
     setError('');
 
     try {
+      // Generate fake email from username
+      const fakeEmail = `${username.toLowerCase()}@kamoted-anime.local`;
+      
       const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
+        email: fakeEmail,
         password
       });
       
@@ -44,12 +47,12 @@ export function Login() {
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           <div>
-            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Email</label>
+            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Username</label>
             <input 
-              type="email" 
+              type="text" 
               required
-              value={email}
-              onChange={e => setEmail(e.target.value)}
+              value={username}
+              onChange={e => setUsername(e.target.value)}
               style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '0.5rem', backgroundColor: 'var(--bg-color-secondary)', border: '1px solid var(--border-color)', color: 'white', outline: 'none' }}
               onFocus={e => e.target.style.borderColor = 'var(--accent-primary)'}
               onBlur={e => e.target.style.borderColor = 'var(--border-color)'}

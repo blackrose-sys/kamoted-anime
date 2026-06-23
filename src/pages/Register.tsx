@@ -5,24 +5,16 @@ import { supabase } from '../lib/supabase';
 
 export function Register() {
   const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const validateEmail = (email: string) => {
-    return String(email)
-      .toLowerCase()
-      .match(
-        /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
-      );
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateEmail(email)) {
-      setError('Please enter a valid, professional email address.');
+    
+    if (username.length < 3) {
+      setError('Username must be at least 3 characters');
       return;
     }
     
@@ -30,8 +22,11 @@ export function Register() {
     setError('');
 
     try {
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email,
+      // Generate a fake email from username for Supabase
+      const fakeEmail = `${username.toLowerCase()}@kamoted-anime.local`;
+      
+      const { error: signUpError } = await supabase.auth.signUp({
+        email: fakeEmail,
         password,
         options: {
           data: { username }
@@ -74,19 +69,6 @@ export function Register() {
             />
           </div>
 
-          <div>
-            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Email</label>
-            <input 
-              type="email" 
-              required
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '0.5rem', backgroundColor: 'var(--bg-color-secondary)', border: '1px solid var(--border-color)', color: 'white', outline: 'none' }}
-              onFocus={e => e.target.style.borderColor = 'var(--accent-primary)'}
-              onBlur={e => e.target.style.borderColor = 'var(--border-color)'}
-            />
-          </div>
-          
           <div>
             <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Password</label>
             <input 

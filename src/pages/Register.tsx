@@ -44,16 +44,27 @@ export function Register() {
         return;
       }
 
-      // Check if email confirmation is needed
-      if (data.user && !data.session) {
-        // Email confirmation required - redirect to verify page
-        navigate('/verify', { state: { email } });
-      } else if (data.session) {
-        // User is automatically logged in
-        navigate('/');
-      } else {
-        setError('Something went wrong. Please try again.');
+      // Save to profiles table for username lookup
+      if (data.user) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .upsert({
+            id: data.user.id,
+            username: username,
+            email: email,
+            created_at: new Date().toISOString()
+          }, {
+            onConflict: 'id'
+          });
+
+        if (profileError) {
+          console.error('Profile save error:', profileError);
+        }
       }
+
+      // Redirect to home regardless of confirmation status
+      // Email confirmation is disabled for now
+      navigate('/');
     } catch (err: any) {
       setError(err.message || 'Network error. Please try again later.');
     } finally {

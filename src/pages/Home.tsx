@@ -125,8 +125,30 @@ export function Home() {
               </div>
             ) : (
               <div className="grid">
-                {recentlyUpdated.slice(0, 24).map((anime, idx) => (
-                  <AnimeCard key={`${anime.mal_id}-${idx}`} anime={anime} />
+                {recentlyUpdated.map((anime, idx) => (
+                  <AnimeCard key={`recent-${anime.mal_id}-${idx}`} anime={anime} />
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* Latest This Season */}
+          <section style={{ marginTop: '4rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '2rem' }}>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '-0.05em' }}>Latest This Season</h2>
+              <Link to="/browse" style={{ color: 'var(--accent-primary)', fontSize: '0.875rem', fontWeight: 700 }}>View All</Link>
+            </div>
+
+            {loading ? (
+              <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '1rem' }}>
+                {[1,2,3,4,5,6].map(i => (
+                  <div key={i} className="animate-pulse" style={{ minWidth: '200px', height: '300px', backgroundColor: 'var(--bg-color-secondary)', borderRadius: '1rem' }}></div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid">
+                {latestAnime.map(anime => (
+                  <AnimeCard key={anime.mal_id} anime={anime} />
                 ))}
               </div>
             )}

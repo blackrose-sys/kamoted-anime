@@ -114,7 +114,7 @@ export function Home() {
           <section>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '2rem' }}>
               <h2 style={{ fontSize: '1.5rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '-0.05em' }}>Recently Updated</h2>
-              <Link to="/browse" style={{ color: 'var(--accent-primary)', fontSize: '0.875rem', fontWeight: 700 }}>View All</Link>
+              <Link to="/browse?tab=recent" style={{ color: 'var(--accent-primary)', fontSize: '0.875rem', fontWeight: 700 }}>View All</Link>
             </div>
 
             {loading ? (
@@ -136,7 +136,7 @@ export function Home() {
           <section style={{ marginTop: '4rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '2rem' }}>
               <h2 style={{ fontSize: '1.5rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '-0.05em' }}>Latest This Season</h2>
-              <Link to="/browse" style={{ color: 'var(--accent-primary)', fontSize: '0.875rem', fontWeight: 700 }}>View All</Link>
+              <Link to="/browse?tab=season" style={{ color: 'var(--accent-primary)', fontSize: '0.875rem', fontWeight: 700 }}>View All</Link>
             </div>
 
             {loading ? (

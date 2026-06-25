@@ -331,7 +331,7 @@ export function Home() {
                     <div style={{ fontSize: '1.5rem', fontWeight: 900, color: idx < 3 ? 'var(--accent-primary)' : 'var(--text-secondary)', minWidth: '30px' }}>
                       {idx + 1}
                     </div>
-                    <img src={anime.images.webp.large_image_url} alt={anime.title} style={{ width: '40px', height: '60px', objectFit: 'cover', borderRadius: '0.25rem' }} loading="lazy" />
+                    <img src={anime.images?.webp?.large_image_url || anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url || ''} alt={anime.title} style={{ width: '40px', height: '60px', objectFit: 'cover', borderRadius: '0.25rem' }} loading="lazy" />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <h4 style={{ fontSize: '0.875rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{anime.title}</h4>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Score: {anime.score || 'N/A'}</div>

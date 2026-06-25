@@ -29,7 +29,7 @@ export function Hero({ featured }: HeroProps) {
       
       {/* Background Images */}
       {featured.map((anime, index) => {
-        const bgImage = anime.trailer?.images?.maximum_image_url || anime.trailer?.images?.large_image_url || anime.images.webp.large_image_url;
+        const bgImage = anime.trailer?.images?.maximum_image_url || anime.trailer?.images?.large_image_url || anime.images?.webp?.large_image_url || anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url || '';
         return (
           <div 
             key={anime.mal_id}

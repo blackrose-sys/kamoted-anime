@@ -3,11 +3,15 @@ import { Link } from 'react-router-dom';
 export interface AnimeData {
   mal_id: number;
   title: string;
-  images: {
-    webp: {
-      image_url: string;
-      large_image_url: string;
-    }
+  images?: {
+    webp?: {
+      image_url?: string;
+      large_image_url?: string;
+    };
+    jpg?: {
+      image_url?: string;
+      large_image_url?: string;
+    };
   };
   trailer?: {
     images?: {
@@ -32,7 +36,7 @@ export function AnimeCard({ anime }: AnimeCardProps) {
     <Link to={`/watch/${anime.mal_id}`} className="anime-card hover-scale">
       <div style={{ position: 'relative' }}>
         <img 
-          src={anime.images.webp.large_image_url} 
+          src={anime.images?.webp?.large_image_url || anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url || ''} 
           alt={anime.title} 
           className="anime-card-image"
           loading="lazy"

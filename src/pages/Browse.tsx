@@ -54,7 +54,7 @@ export function Browse() {
           // Fetch recently updated episodes
           const res = await fetch('https://api.jikan.moe/v4/watch/episodes');
           const data = await res.json();
-          const mapped = (data.data || [])
+          const watchEpisodes = (data.data || [])
             .filter((item: any) => {
               if (item.region_locked) return false;
               const imgUrl = item.entry?.images?.jpg?.image_url || '';
@@ -71,7 +71,35 @@ export function Browse() {
                 ? parseInt(item.episodes[0].title.replace(/\D/g, ''), 10) || null 
                 : null
             }));
-          setResults(mapped);
+
+          // Deduplicate
+          const seenIds = new Set<number>();
+          const uniqueRecent: AnimeData[] = [];
+          for (const anime of watchEpisodes) {
+            if (!seenIds.has(anime.mal_id)) {
+              seenIds.add(anime.mal_id);
+              uniqueRecent.push(anime);
+            }
+          }
+
+          // Fetch current season airing shows to pad up to 24
+          const seasonRes = await fetch('https://api.jikan.moe/v4/seasons/now?limit=24');
+          const seasonData = await seasonRes.json();
+          const seasonFiltered = (seasonData.data || []).filter((anime: any) => {
+            const imgUrl = anime.images?.jpg?.image_url || '';
+            return !imgUrl.includes('icon-banned') && !imgUrl.includes('na.gif');
+          });
+
+          const combined = [...uniqueRecent];
+          for (const airing of seasonFiltered) {
+            if (combined.length >= 24) break;
+            if (!seenIds.has(airing.mal_id)) {
+              seenIds.add(airing.mal_id);
+              combined.push(airing);
+            }
+          }
+
+          setResults(combined);
           setHasNextPage(false);
         } else if (activeTab === 'season') {
           // Fetch current season anime with pagination

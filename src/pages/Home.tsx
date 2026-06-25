@@ -82,7 +82,7 @@ export function Home() {
       let recentData = getCached<AnimeData[]>('home_recent');
       if (!recentData) {
         const res = await fetchWithRetry('https://api.jikan.moe/v4/watch/episodes');
-        recentData = (res.data || [])
+        const watchEpisodes = (res.data || [])
           .filter((item: any) => {
             if (item.region_locked) return false;
             const imgUrl = item.entry?.images?.jpg?.image_url || '';
@@ -98,6 +98,29 @@ export function Home() {
               ? parseInt(item.episodes[0].title.replace(/\D/g, ''), 10) || null
               : null
           }));
+
+        // Deduplicate recent episodes
+        const seenIds = new Set<number>();
+        const uniqueRecent: AnimeData[] = [];
+        for (const anime of watchEpisodes) {
+          if (!seenIds.has(anime.mal_id)) {
+            seenIds.add(anime.mal_id);
+            uniqueRecent.push(anime);
+          }
+        }
+
+        // Pad list up to 24 items with currently airing shows
+        const fallbackAiring = latestData || [];
+        const combined = [...uniqueRecent];
+        for (const airing of fallbackAiring) {
+          if (combined.length >= 24) break;
+          if (!seenIds.has(airing.mal_id)) {
+            seenIds.add(airing.mal_id);
+            combined.push(airing);
+          }
+        }
+
+        recentData = combined;
         setCache('home_recent', recentData);
       }
       setRecentlyUpdated(recentData || []);

@@ -24,7 +24,7 @@ export function Footer() {
         </div>
         
         <div style={{ marginTop: '3rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>
-          © {new Date().getFullYear()} kamoted. All rights reserved. Created by kamotedelight.
+          © {new Date().getFullYear()} kamoted. All rights reserved.
         </div>
       </div>
     </footer>

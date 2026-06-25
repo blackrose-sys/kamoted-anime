@@ -264,7 +264,7 @@ CREATE TABLE IF NOT EXISTS public.watch_rooms (
   anime_id INT NOT NULL,
   episode INT NOT NULL DEFAULT 1,
   is_playing BOOLEAN DEFAULT false,
-  current_time FLOAT DEFAULT 0,
+  "current_time" FLOAT DEFAULT 0,
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 

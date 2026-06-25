@@ -67,10 +67,20 @@ export function Home() {
       let latestData = getCached<AnimeData[]>('home_latest');
       if (!latestData) {
         const res = await fetchWithRetry('https://api.jikan.moe/v4/seasons/now?limit=24');
-        latestData = (res.data || []).filter((a: any) => {
-          const img = a.images?.jpg?.image_url || '';
-          return !img.includes('icon-banned') && !img.includes('na.gif');
-        });
+        const rawList = res.data || [];
+        const seenIds = new Set<number>();
+        const uniqueList: AnimeData[] = [];
+        
+        for (const anime of rawList) {
+          if (!seenIds.has(anime.mal_id)) {
+            const img = anime.images?.jpg?.image_url || '';
+            if (!img.includes('icon-banned') && !img.includes('na.gif')) {
+              seenIds.add(anime.mal_id);
+              uniqueList.push(anime);
+            }
+          }
+        }
+        latestData = uniqueList;
         setCache('home_latest', latestData);
       }
       setLatestAnime(latestData || []);
@@ -132,7 +142,17 @@ export function Home() {
       let topData = getCached<AnimeData[]>('home_top');
       if (!topData) {
         const res = await fetchWithRetry('https://api.jikan.moe/v4/top/anime?limit=10');
-        topData = res.data || [];
+        const rawList = res.data || [];
+        const seenIds = new Set<number>();
+        const uniqueList: AnimeData[] = [];
+        
+        for (const anime of rawList) {
+          if (!seenIds.has(anime.mal_id)) {
+            seenIds.add(anime.mal_id);
+            uniqueList.push(anime);
+          }
+        }
+        topData = uniqueList;
         setCache('home_top', topData);
       }
       setTopAnime(topData || []);

@@ -110,9 +110,23 @@ export function Browse() {
             return !imgUrl.includes('icon-banned') && !imgUrl.includes('na.gif');
           });
           if (page === 1) {
-            setResults(filtered);
+            const seen = new Set<number>();
+            const unique = filtered.filter((a: any) => {
+              if (seen.has(a.mal_id)) return false;
+              seen.add(a.mal_id);
+              return true;
+            });
+            setResults(unique);
           } else {
-            setResults(prev => [...prev, ...filtered]);
+            setResults(prev => {
+              const seen = new Set(prev.map(a => a.mal_id));
+              const uniqueNew = filtered.filter((a: any) => {
+                if (seen.has(a.mal_id)) return false;
+                seen.add(a.mal_id);
+                return true;
+              });
+              return [...prev, ...uniqueNew];
+            });
           }
           setHasNextPage(data.pagination?.has_next_page || false);
         } else {
@@ -130,10 +144,25 @@ export function Browse() {
 
           const res = await fetch(url);
           const data = await res.json();
+          const raw = data.data || [];
           if (page === 1) {
-            setResults(data.data || []);
+            const seen = new Set<number>();
+            const unique = raw.filter((a: any) => {
+              if (seen.has(a.mal_id)) return false;
+              seen.add(a.mal_id);
+              return true;
+            });
+            setResults(unique);
           } else {
-            setResults(prev => [...prev, ...(data.data || [])]);
+            setResults(prev => {
+              const seen = new Set(prev.map(a => a.mal_id));
+              const uniqueNew = raw.filter((a: any) => {
+                if (seen.has(a.mal_id)) return false;
+                seen.add(a.mal_id);
+                return true;
+              });
+              return [...prev, ...uniqueNew];
+            });
           }
           setHasNextPage(data.pagination?.has_next_page || false);
         }

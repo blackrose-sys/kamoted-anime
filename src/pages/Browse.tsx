@@ -51,63 +51,95 @@ export function Browse() {
       setLoading(true);
       try {
         if (activeTab === 'recent') {
-          const query = `
-            query ($airingAtGreater: Int, $airingAtLesser: Int) {
-              Page(page: 1, perPage: 50) {
-                airingSchedules(airingAt_greater: $airingAtGreater, airingAt_lesser: $airingAtLesser, sort: TIME_DESC) {
-                  episode
-                  media {
-                    idMal
-                    isAdult
-                    title {
-                      romaji
-                      english
-                      userPreferred
+          let mapped: AnimeData[] = [];
+          try {
+            const query = `
+              query ($airingAtGreater: Int, $airingAtLesser: Int) {
+                Page(page: 1, perPage: 50) {
+                  airingSchedules(airingAt_greater: $airingAtGreater, airingAt_lesser: $airingAtLesser, sort: TIME_DESC) {
+                    episode
+                    media {
+                      idMal
+                      isAdult
+                      title {
+                        romaji
+                        english
+                        userPreferred
+                      }
+                      coverImage {
+                        large
+                      }
+                      averageScore
+                      seasonYear
                     }
-                    coverImage {
-                      large
-                    }
-                    averageScore
-                    seasonYear
                   }
                 }
               }
-            }
-          `;
+            `;
 
-          const now = Math.floor(Date.now() / 1000);
-          const sevenDaysAgo = now - (7 * 24 * 60 * 60);
+            const now = Math.floor(Date.now() / 1000);
+            const sevenDaysAgo = now - (7 * 24 * 60 * 60);
 
-          const response = await fetch('https://graphql.anilist.co', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              query,
-              variables: {
-                airingAtGreater: sevenDaysAgo,
-                airingAtLesser: now
-              }
-            })
-          });
-
-          const resData = await response.json();
-          const schedules = resData?.data?.Page?.airingSchedules || [];
-
-          const mapped = schedules
-            .filter((s: any) => s.media && s.media.idMal && !s.media.isAdult)
-            .map((s: any) => ({
-              mal_id: s.media.idMal,
-              title: s.media.title.english || s.media.title.userPreferred || s.media.title.romaji,
-              images: {
-                jpg: {
-                  image_url: s.media.coverImage.large,
-                  large_image_url: s.media.coverImage.large
+            const response = await fetch('https://graphql.anilist.co', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                query,
+                variables: {
+                  airingAtGreater: sevenDaysAgo,
+                  airingAtLesser: now
                 }
-              },
-              score: s.media.averageScore ? s.media.averageScore / 10 : null,
-              year: s.media.seasonYear || null,
-              episodes: s.episode
-            }));
+              })
+            });
+
+            const resData = await response.json();
+            const schedules = resData?.data?.Page?.airingSchedules || [];
+
+            mapped = schedules
+              .filter((s: any) => s.media && s.media.idMal && !s.media.isAdult)
+              .map((s: any) => ({
+                mal_id: s.media.idMal,
+                title: s.media.title.english || s.media.title.userPreferred || s.media.title.romaji,
+                images: {
+                  jpg: {
+                    image_url: s.media.coverImage.large,
+                    large_image_url: s.media.coverImage.large
+                  }
+                },
+                score: s.media.averageScore ? s.media.averageScore / 10 : null,
+                year: s.media.seasonYear || null,
+                episodes: s.episode
+              }));
+          } catch (err) {
+            console.error('Failed to fetch AniList schedules in Browse, using Jikan fallback...', err);
+            try {
+              const fallbackRes = await fetch('https://api.jikan.moe/v4/watch/episodes');
+              const fallbackData = await fallbackRes.json();
+              const raw = fallbackData.data || [];
+              mapped = raw.map((item: any) => ({
+                mal_id: item.entry.mal_id,
+                title: item.entry.title,
+                images: {
+                  jpg: {
+                    image_url: item.entry.images?.jpg?.image_url || '',
+                    large_image_url: item.entry.images?.jpg?.large_image_url || ''
+                  },
+                  webp: {
+                    image_url: item.entry.images?.webp?.image_url || '',
+                    large_image_url: item.entry.images?.webp?.large_image_url || ''
+                  }
+                },
+                score: null,
+                year: null,
+                season: null,
+                episodes: item.episodes && item.episodes[0] 
+                  ? parseInt(item.episodes[0].title.replace(/\D/g, '')) || null 
+                  : null
+              }));
+            } catch (fallbackErr) {
+              console.error('Jikan fallback failed in Browse:', fallbackErr);
+            }
+          }
 
           // Deduplicate
           const seenIds = new Set<number>();
@@ -120,12 +152,17 @@ export function Browse() {
           }
 
           // Fetch current season airing shows to pad up to 24 if needed
-          const seasonRes = await fetch('https://api.jikan.moe/v4/seasons/now?sfw=true&limit=24');
-          const seasonData = await seasonRes.json();
-          const seasonFiltered = (seasonData.data || []).filter((anime: any) => {
-            const imgUrl = anime.images?.jpg?.image_url || '';
-            return !imgUrl.includes('icon-banned') && !imgUrl.includes('na.gif');
-          });
+          let seasonFiltered: AnimeData[] = [];
+          try {
+            const seasonRes = await fetch('https://api.jikan.moe/v4/seasons/now?sfw=true&limit=24');
+            const seasonData = await seasonRes.json();
+            seasonFiltered = (seasonData.data || []).filter((anime: any) => {
+              const imgUrl = anime.images?.jpg?.image_url || '';
+              return !imgUrl.includes('icon-banned') && !imgUrl.includes('na.gif');
+            });
+          } catch (seasonErr) {
+            console.error('Failed to fetch season padding in Browse:', seasonErr);
+          }
 
           const combined = [...uniqueRecent];
           for (const airing of seasonFiltered) {

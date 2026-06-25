@@ -182,9 +182,58 @@ export function Home() {
       }
       setRecentlyUpdated(recentData || []);
     } catch (err) {
-      console.error('Failed to fetch recently updated data:', err);
-      // Fallback: If AniList fails (e.g. adblock blocked), fill recently updated with seasonal data
-      setRecentlyUpdated(latestData.slice(0, 24));
+      console.error('Failed to fetch recently updated data from AniList, trying Jikan fallback...', err);
+      try {
+        const fallbackRes = await fetchWithRetry('https://api.jikan.moe/v4/watch/episodes');
+        const raw = fallbackRes.data || [];
+        const mapped = raw.map((item: any) => ({
+          mal_id: item.entry.mal_id,
+          title: item.entry.title,
+          images: {
+            jpg: {
+              image_url: item.entry.images?.jpg?.image_url || '',
+              large_image_url: item.entry.images?.jpg?.large_image_url || ''
+            },
+            webp: {
+              image_url: item.entry.images?.webp?.image_url || '',
+              large_image_url: item.entry.images?.webp?.large_image_url || ''
+            }
+          },
+          score: null,
+          year: null,
+          season: null,
+          episodes: item.episodes && item.episodes[0] 
+            ? parseInt(item.episodes[0].title.replace(/\D/g, '')) || null 
+            : null
+        }));
+
+        const seenIds = new Set<number>();
+        const uniqueRecent: AnimeData[] = [];
+        for (const anime of mapped) {
+          if (!seenIds.has(anime.mal_id)) {
+            seenIds.add(anime.mal_id);
+            uniqueRecent.push(anime);
+          }
+        }
+        
+        // Pad list up to 24 items with currently airing shows if needed
+        const combined = [...uniqueRecent];
+        for (const airing of latestData) {
+          if (combined.length >= 24) break;
+          if (!seenIds.has(airing.mal_id)) {
+            seenIds.add(airing.mal_id);
+            combined.push(airing);
+          }
+        }
+
+        const recentData = combined.slice(0, 24);
+        setRecentlyUpdated(recentData);
+        setCache('home_recent', recentData);
+      } catch (fallbackErr) {
+        console.error('Jikan fallback failed too:', fallbackErr);
+        // Absolute fallback
+        setRecentlyUpdated(latestData.slice(0, 24));
+      }
     }
 
     // Small delay

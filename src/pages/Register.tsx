@@ -48,7 +48,7 @@ export function Register() {
     setLoading(true);
 
     try {
-      const { error: signUpError } = await supabase.auth.signUp({
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
         password,
         options: {
@@ -65,8 +65,13 @@ export function Register() {
         return;
       }
 
-      // Redirect to verify page with the email
-      navigate('/verify', { state: { email: email.trim().toLowerCase() } });
+      // Check if session is already active (i.e. email confirmation is disabled)
+      if (data?.session) {
+        navigate('/');
+      } else {
+        // Redirect to verify page with the email
+        navigate('/verify', { state: { email: email.trim().toLowerCase() } });
+      }
     } catch (err: any) {
       setError(err.message || 'Network error. Please try again later.');
     } finally {

@@ -29,7 +29,9 @@ CREATE TABLE IF NOT EXISTS watch_history (
 -- ===================================================
 -- 3. Create Public Profiles Table
 -- ===================================================
-CREATE TABLE IF NOT EXISTS public.profiles (
+DROP TABLE IF EXISTS public.profiles CASCADE;
+
+CREATE TABLE public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT UNIQUE NOT NULL,
   username TEXT NOT NULL,

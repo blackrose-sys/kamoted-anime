@@ -22,37 +22,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setUser({
-          id: session.user.id,
-          email: session.user.email!,
-          username: session.user.user_metadata?.username || session.user.email!.split('@')[0],
-          avatar_url: session.user.user_metadata?.avatar_url || null
-        });
-      }
-      setIsLoading(false);
-    }).catch(() => {
-      setIsLoading(false);
-    });
+    let subscription: { unsubscribe: () => void } | null = null;
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        setUser({
-          id: session.user.id,
-          email: session.user.email!,
-          username: session.user.user_metadata?.username || session.user.email!.split('@')[0],
-          avatar_url: session.user.user_metadata?.avatar_url || null
-        });
-      } else {
-        setUser(null);
-      }
-      setIsLoading(false);
-    });
+    try {
+      // Get initial session
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user) {
+          setUser({
+            id: session.user.id,
+            email: session.user.email!,
+            username: session.user.user_metadata?.username || session.user.email!.split('@')[0],
+            avatar_url: session.user.user_metadata?.avatar_url || null
+          });
+        }
+        setIsLoading(false);
+      }).catch(() => {
+        setIsLoading(false);
+      });
 
-    return () => subscription.unsubscribe();
+      // Listen for auth changes
+      const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (session?.user) {
+          setUser({
+            id: session.user.id,
+            email: session.user.email!,
+            username: session.user.user_metadata?.username || session.user.email!.split('@')[0],
+            avatar_url: session.user.user_metadata?.avatar_url || null
+          });
+        } else {
+          setUser(null);
+        }
+        setIsLoading(false);
+      });
+      subscription = data.subscription;
+    } catch (err) {
+      console.error('Auth init failed:', err);
+      setIsLoading(false);
+    }
+
+    return () => {
+      subscription?.unsubscribe();
+    };
   }, []);
 
   const logout = async () => {

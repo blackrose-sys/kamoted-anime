@@ -58,6 +58,7 @@ export function Browse() {
                   episode
                   media {
                     idMal
+                    isAdult
                     title {
                       romaji
                       english
@@ -93,7 +94,7 @@ export function Browse() {
           const schedules = resData?.data?.Page?.airingSchedules || [];
 
           const mapped = schedules
-            .filter((s: any) => s.media && s.media.idMal)
+            .filter((s: any) => s.media && s.media.idMal && !s.media.isAdult)
             .map((s: any) => ({
               mal_id: s.media.idMal,
               title: s.media.title.english || s.media.title.userPreferred || s.media.title.romaji,
@@ -119,7 +120,7 @@ export function Browse() {
           }
 
           // Fetch current season airing shows to pad up to 24 if needed
-          const seasonRes = await fetch('https://api.jikan.moe/v4/seasons/now?limit=24');
+          const seasonRes = await fetch('https://api.jikan.moe/v4/seasons/now?sfw=true&limit=24');
           const seasonData = await seasonRes.json();
           const seasonFiltered = (seasonData.data || []).filter((anime: any) => {
             const imgUrl = anime.images?.jpg?.image_url || '';
@@ -139,7 +140,7 @@ export function Browse() {
           setHasNextPage(false);
         } else if (activeTab === 'season') {
           // Fetch current season anime with pagination
-          const res = await fetch(`https://api.jikan.moe/v4/seasons/now?limit=24&page=${page}`);
+          const res = await fetch(`https://api.jikan.moe/v4/seasons/now?sfw=true&limit=24&page=${page}`);
           const data = await res.json();
           const filtered = (data.data || []).filter((anime: any) => {
             const imgUrl = anime.images?.jpg?.image_url || '';

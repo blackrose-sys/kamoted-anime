@@ -66,7 +66,7 @@ export function Home() {
       // 1. Latest this season (check cache first)
       let latestData = getCached<AnimeData[]>('home_latest');
       if (!latestData) {
-        const res = await fetchWithRetry('https://api.jikan.moe/v4/seasons/now?limit=24');
+        const res = await fetchWithRetry('https://api.jikan.moe/v4/seasons/now?sfw=true&limit=24');
         const rawList = res.data || [];
         const seenIds = new Set<number>();
         const uniqueList: AnimeData[] = [];
@@ -98,6 +98,7 @@ export function Home() {
                 episode
                 media {
                   idMal
+                  isAdult
                   title {
                     romaji
                     english
@@ -133,7 +134,7 @@ export function Home() {
         const schedules = resData?.data?.Page?.airingSchedules || [];
 
         const mapped = schedules
-          .filter((s: any) => s.media && s.media.idMal)
+          .filter((s: any) => s.media && s.media.idMal && !s.media.isAdult)
           .map((s: any) => ({
             mal_id: s.media.idMal,
             title: s.media.title.english || s.media.title.userPreferred || s.media.title.romaji,
@@ -180,7 +181,7 @@ export function Home() {
       // 3. Top anime (check cache first)
       let topData = getCached<AnimeData[]>('home_top');
       if (!topData) {
-        const res = await fetchWithRetry('https://api.jikan.moe/v4/top/anime?limit=10');
+        const res = await fetchWithRetry('https://api.jikan.moe/v4/top/anime?sfw=true&limit=10');
         const rawList = res.data || [];
         const seenIds = new Set<number>();
         const uniqueList: AnimeData[] = [];

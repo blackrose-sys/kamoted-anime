@@ -33,6 +33,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
       }
       setIsLoading(false);
+    }).catch(() => {
+      setIsLoading(false);
     });
 
     // Listen for auth changes

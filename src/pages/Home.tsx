@@ -1,11 +1,52 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Hero } from '../components/Hero';
 import { AnimeCard } from '../components/AnimeCard';
 import type { AnimeData } from '../components/AnimeCard';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { Play } from 'lucide-react';
+import { Play, AlertCircle, RefreshCw } from 'lucide-react';
+
+// --- Caching Layer ---
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+function getCached<T>(key: string): T | null {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const { data, ts } = JSON.parse(raw);
+    if (Date.now() - ts > CACHE_TTL) {
+      sessionStorage.removeItem(key);
+      return null;
+    }
+    return data as T;
+  } catch { return null; }
+}
+
+function setCache<T>(key: string, data: T): void {
+  try {
+    sessionStorage.setItem(key, JSON.stringify({ data, ts: Date.now() }));
+  } catch { /* storage full, ignore */ }
+}
+
+// --- Fetch with Retry ---
+async function fetchWithRetry(url: string, retries = 3, delayMs = 1500): Promise<any> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const res = await fetch(url);
+      if (res.status === 429) {
+        // Rate limited — wait and retry
+        await new Promise(r => setTimeout(r, delayMs * (i + 1)));
+        continue;
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      if (i === retries - 1) throw err;
+      await new Promise(r => setTimeout(r, delayMs * (i + 1)));
+    }
+  }
+}
 
 export function Home() {
   const [latestAnime, setLatestAnime] = useState<AnimeData[]>([]);
@@ -13,42 +54,39 @@ export function Home() {
   const [topAnime, setTopAnime] = useState<AnimeData[]>([]);
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const latestRes = await fetch('https://api.jikan.moe/v4/seasons/now?limit=24');
-        const latestData = await latestRes.json();
-        
-        await new Promise(r => setTimeout(r, 1000)); // Bypass rate limit
-        
-        const recentRes = await fetch('https://api.jikan.moe/v4/watch/episodes');
-        const recentData = await recentRes.json();
-        
-        await new Promise(r => setTimeout(r, 1000)); // Bypass rate limit
-        
-        const topRes = await fetch('https://api.jikan.moe/v4/top/anime?limit=10');
-        const topData = await topRes.json();
+  // --- Fetch anime data (separate from user data) ---
+  const fetchAnimeData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
-        if (user) {
-          const { data } = await supabase.from('watch_history')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('updated_at', { ascending: false })
-            .limit(4);
-          setHistory(data || []);
-        }
-        
-        // Map recently updated data to match AnimeData structure
-        // Filter out region-locked entries and broken placeholder images
-        const mappedRecent = (recentData.data || [])
+    try {
+      // 1. Latest this season (check cache first)
+      let latestData = getCached<AnimeData[]>('home_latest');
+      if (!latestData) {
+        const res = await fetchWithRetry('https://api.jikan.moe/v4/seasons/now?limit=24');
+        latestData = (res.data || []).filter((a: any) => {
+          const img = a.images?.jpg?.image_url || '';
+          return !img.includes('icon-banned') && !img.includes('na.gif');
+        });
+        setCache('home_latest', latestData);
+      }
+      setLatestAnime(latestData || []);
+
+      // Small delay to avoid rate limit
+      await new Promise(r => setTimeout(r, 600));
+
+      // 2. Recently updated (check cache first)
+      let recentData = getCached<AnimeData[]>('home_recent');
+      if (!recentData) {
+        const res = await fetchWithRetry('https://api.jikan.moe/v4/watch/episodes');
+        recentData = (res.data || [])
           .filter((item: any) => {
             if (item.region_locked) return false;
             const imgUrl = item.entry?.images?.jpg?.image_url || '';
-            if (imgUrl.includes('icon-banned') || imgUrl.includes('na.gif')) return false;
-            return true;
+            return !imgUrl.includes('icon-banned') && !imgUrl.includes('na.gif');
           })
           .map((item: any) => ({
             mal_id: item.entry.mal_id,
@@ -56,21 +94,50 @@ export function Home() {
             images: item.entry.images,
             score: null,
             year: null,
-            // Extract episode number from the episodes array
-            episodes: item.episodes && item.episodes.length > 0 ? parseInt(item.episodes[0].title.replace(/\D/g, ''), 10) || null : null
+            episodes: item.episodes?.length > 0
+              ? parseInt(item.episodes[0].title.replace(/\D/g, ''), 10) || null
+              : null
           }));
-
-        setLatestAnime(latestData.data || []);
-        setRecentlyUpdated(mappedRecent);
-        setTopAnime(topData.data || []);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
+        setCache('home_recent', recentData);
       }
-    };
+      setRecentlyUpdated(recentData || []);
 
-    fetchData();
+      // Small delay
+      await new Promise(r => setTimeout(r, 600));
+
+      // 3. Top anime (check cache first)
+      let topData = getCached<AnimeData[]>('home_top');
+      if (!topData) {
+        const res = await fetchWithRetry('https://api.jikan.moe/v4/top/anime?limit=10');
+        topData = res.data || [];
+        setCache('home_top', topData);
+      }
+      setTopAnime(topData || []);
+    } catch (err: any) {
+      console.error('Failed to fetch anime data:', err);
+      setError('Failed to load anime data. Please refresh the page.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Fetch anime data ONCE on mount (no dependency on user)
+  useEffect(() => {
+    fetchAnimeData();
+  }, [fetchAnimeData]);
+
+  // Fetch user history SEPARATELY
+  useEffect(() => {
+    if (!user) {
+      setHistory([]);
+      return;
+    }
+    supabase.from('watch_history')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('updated_at', { ascending: false })
+      .limit(6)
+      .then(({ data }) => setHistory(data || []));
   }, [user]);
 
   return (
@@ -81,6 +148,17 @@ export function Home() {
         
         {/* Main Content */}
         <div style={{ flex: '3 1 70%' }}>
+
+          {/* Error State */}
+          {error && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1.5rem', backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '1rem', marginBottom: '2rem' }}>
+              <AlertCircle size={24} color="#ef4444" />
+              <span style={{ color: '#fca5a5', flex: 1 }}>{error}</span>
+              <button onClick={fetchAnimeData} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem' }}>
+                <RefreshCw size={16} /> Retry
+              </button>
+            </div>
+          )}
           
           {/* Continue Watching Section */}
           {history.length > 0 && (
@@ -92,17 +170,17 @@ export function Home() {
               <div className="grid">
                 {history.map(item => (
                   <Link to={`/watch/${item.anime_id}`} key={item.id} className="hover-scale" style={{ display: 'block', backgroundColor: 'var(--bg-color-secondary)', borderRadius: '0.75rem', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
-                    <div style={{ width: '100%', aspectRatio: '16/9', position: 'relative' }}>
-                      <img src={item.image_url} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <div style={{ width: '100%', aspectRatio: '2/3', position: 'relative' }}>
+                      <img src={item.image_url} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
                       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0.5rem', background: 'linear-gradient(transparent, rgba(0,0,0,0.9))' }}>
                         <span style={{ backgroundColor: 'var(--accent-primary)', color: 'black', padding: '0.1rem 0.5rem', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 800 }}>EP {item.last_episode}</span>
                       </div>
-                      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', opacity: 0.8 }} className="play-icon-overlay">
+                      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', opacity: 0.8 }}>
                         <Play size={40} color="var(--accent-primary)" fill="var(--accent-primary)" />
                       </div>
                     </div>
-                    <div style={{ padding: '0.75rem' }}>
-                      <h3 style={{ fontSize: '0.875rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</h3>
+                    <div style={{ padding: '0.5rem' }}>
+                      <h3 style={{ fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</h3>
                     </div>
                   </Link>
                 ))}
@@ -118,9 +196,9 @@ export function Home() {
             </div>
 
             {loading ? (
-              <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '1rem' }}>
-                {[1,2,3,4].map(i => (
-                  <div key={i} className="animate-pulse" style={{ minWidth: '200px', height: '300px', backgroundColor: 'var(--bg-color-secondary)', borderRadius: '1rem' }}></div>
+              <div className="grid">
+                {[1,2,3,4,5,6].map(i => (
+                  <div key={i} className="animate-pulse" style={{ aspectRatio: '2/3', backgroundColor: 'var(--bg-color-secondary)', borderRadius: '0.75rem' }}></div>
                 ))}
               </div>
             ) : (
@@ -140,9 +218,9 @@ export function Home() {
             </div>
 
             {loading ? (
-              <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '1rem' }}>
-                {[1,2,3,4,5,6].map(i => (
-                  <div key={i} className="animate-pulse" style={{ minWidth: '200px', height: '300px', backgroundColor: 'var(--bg-color-secondary)', borderRadius: '1rem' }}></div>
+              <div className="grid">
+                {[1,2,3,4,5,6,7,8].map(i => (
+                  <div key={i} className="animate-pulse" style={{ aspectRatio: '2/3', backgroundColor: 'var(--bg-color-secondary)', borderRadius: '0.75rem' }}></div>
                 ))}
               </div>
             ) : (
@@ -157,7 +235,7 @@ export function Home() {
 
         {/* Sidebar */}
         <aside style={{ flex: '1 1 25%', minWidth: '300px' }}>
-          <div style={{ backgroundColor: 'var(--bg-color-secondary)', borderRadius: '1rem', padding: '1.5rem', border: '1px solid var(--border-color)' }}>
+          <div style={{ backgroundColor: 'var(--bg-color-secondary)', borderRadius: '1rem', padding: '1.5rem', border: '1px solid var(--border-color)', position: 'sticky', top: 'calc(var(--nav-height) + 1rem)' }}>
             <h2 style={{ fontSize: '1.25rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '-0.05em', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '1rem' }}>Top Anime</h2>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -171,7 +249,7 @@ export function Home() {
                     <div style={{ fontSize: '1.5rem', fontWeight: 900, color: idx < 3 ? 'var(--accent-primary)' : 'var(--text-secondary)', minWidth: '30px' }}>
                       {idx + 1}
                     </div>
-                    <img src={anime.images.webp.large_image_url} alt={anime.title} style={{ width: '40px', height: '60px', objectFit: 'cover', borderRadius: '0.25rem' }} />
+                    <img src={anime.images.webp.large_image_url} alt={anime.title} style={{ width: '40px', height: '60px', objectFit: 'cover', borderRadius: '0.25rem' }} loading="lazy" />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <h4 style={{ fontSize: '0.875rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{anime.title}</h4>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Score: {anime.score || 'N/A'}</div>

@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Search, ChevronDown, BookmarkPlus, BookmarkCheck, Server, SkipForward, ChevronRight, ChevronLeft, ToggleLeft, ToggleRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { animeServers, getServerUrl, fetchEpisodesFromServer, type AnimeServer } from '../lib/animeServers';
+import { animeServers, getServerUrl, fetchEpisodesFromServer, convertMalToAnilist, type AnimeServer } from '../lib/animeServers';
 
 export function Watch() {
   const { id } = useParams<{ id: string }>();
@@ -32,6 +32,13 @@ export function Watch() {
     if (id) {
       const cacheBuster = Date.now();
       
+      // Get AniList ID conversion
+      convertMalToAnilist(id)
+        .then(aId => {
+          if (aId) setAnilistId(aId);
+        })
+        .catch(console.error);
+
       fetch(`https://api.jikan.moe/v4/anime/${id}?_=${cacheBuster}`)
         .then(res => res.json())
         .then(data => {
@@ -39,7 +46,7 @@ export function Watch() {
             setAnimeName(data.data.title);
             setAnimeImage(data.data.images?.webp?.large_image_url || '');
             
-            // Try to get AniList ID from the response
+            // Try to get AniList ID from the response (fallback)
             if (data.data.url) {
               const anilistMatch = data.data.url.match(/anilist\.co\/anime\/(\d+)/);
               if (anilistMatch) {

@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Search, ChevronDown, BookmarkPlus, BookmarkCheck, Server, SkipForward, ChevronRight, ChevronLeft, ToggleLeft, ToggleRight, Check } from 'lucide-react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Search, ChevronDown, BookmarkPlus, BookmarkCheck, Server, SkipForward, ChevronRight, ChevronLeft, ToggleLeft, ToggleRight, Check, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { animeServers, getServerUrl, fetchAniListMetadata, type AnimeServer } from '../lib/animeServers';
@@ -9,6 +9,7 @@ import { CommentSection } from '../components/CommentSection';
 export function Watch() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
+  const navigate = useNavigate();
   
   const [animeName, setAnimeName] = useState('Loading...');
   const [animeImage, setAnimeImage] = useState('');
@@ -197,6 +198,74 @@ export function Watch() {
         last_episode: epNum,
         updated_at: new Date().toISOString()
       }, { onConflict: 'user_id, anime_id' });
+
+      // Daily Watch Streak Counter
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('streak_count, streak_last_date')
+          .eq('id', user.id)
+          .maybeSingle();
+        
+        if (profile) {
+          const todayStr = new Date().toISOString().split('T')[0];
+          let nextStreak = 1;
+          let updateRequired = false;
+          
+          if (!profile.streak_last_date) {
+            nextStreak = 1;
+            updateRequired = true;
+          } else {
+            const lastDate = new Date(profile.streak_last_date);
+            const todayDate = new Date(todayStr);
+            const diffTime = Math.abs(todayDate.getTime() - lastDate.getTime());
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            if (diffDays === 1) {
+              nextStreak = (profile.streak_count || 0) + 1;
+              updateRequired = true;
+            } else if (diffDays > 1) {
+              nextStreak = 1;
+              updateRequired = true;
+            }
+          }
+          
+          if (updateRequired) {
+            await supabase
+              .from('profiles')
+              .update({
+                streak_count: nextStreak,
+                streak_last_date: todayStr
+              })
+              .eq('id', user.id);
+          }
+        }
+      } catch (streakErr) {
+        console.error('Failed to update streak:', streakErr);
+      }
+    }
+  };
+
+  const handleCreateWatchRoom = async () => {
+    if (!user) return alert('Please login to create a watch room!');
+    try {
+      const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const { error } = await supabase
+        .from('watch_rooms')
+        .insert({
+          room_code: code,
+          host_id: user.id,
+          anime_id: parseInt(id || '1'),
+          episode: selectedEpisode,
+          is_playing: false,
+          current_time: 0
+        });
+      
+      if (error) throw error;
+      navigate(`/room/${code}`);
+    } catch (err) {
+      console.error('Failed to create watch room:', err);
+      alert('Failed to create watch room. Please try again.');
     }
   };
 
@@ -488,25 +557,42 @@ export function Watch() {
                   )}
                 </div>
 
-                <div style={{ position: 'relative', marginLeft: 'auto' }}>
-                  <button 
-                    onClick={() => setShowWatchlistDropdown(!showWatchlistDropdown)}
-                    disabled={watchlistLoading}
-                    className="btn-primary"
+                 <button 
+                    onClick={handleCreateWatchRoom}
+                    className="btn-primary hover-scale"
                     style={{ 
-                      backgroundColor: inWatchlist ? 'rgba(168, 85, 247, 0.2)' : 'var(--bg-color-secondary)', 
-                      color: inWatchlist ? 'var(--accent-primary)' : 'white',
-                      border: `1px solid ${inWatchlist ? 'var(--accent-primary)' : 'var(--border-color)'}`,
+                      backgroundColor: 'rgba(245, 158, 11, 0.1)', 
+                      color: 'var(--accent-primary)',
+                      border: '1px solid rgba(245, 158, 11, 0.3)',
                       display: 'flex', 
                       alignItems: 'center', 
                       gap: '0.5rem',
                       cursor: 'pointer'
                     }}
                   >
-                    {inWatchlist ? <BookmarkCheck size={18} /> : <BookmarkPlus size={18} />}
-                    <span>{inWatchlist ? getStatusLabel(watchlistStatus) : 'Add to Watchlist'}</span>
-                    <ChevronDown size={14} />
+                    <Users size={16} />
+                    <span>Watch Together</span>
                   </button>
+
+                  <div style={{ position: 'relative', marginLeft: 'auto' }}>
+                    <button 
+                      onClick={() => setShowWatchlistDropdown(!showWatchlistDropdown)}
+                      disabled={watchlistLoading}
+                      className="btn-primary"
+                      style={{ 
+                        backgroundColor: inWatchlist ? 'rgba(168, 85, 247, 0.2)' : 'var(--bg-color-secondary)', 
+                        color: inWatchlist ? 'var(--accent-primary)' : 'white',
+                        border: `1px solid ${inWatchlist ? 'var(--accent-primary)' : 'var(--border-color)'}`,
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '0.5rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {inWatchlist ? <BookmarkCheck size={18} /> : <BookmarkPlus size={18} />}
+                      <span>{inWatchlist ? getStatusLabel(watchlistStatus) : 'Add to Watchlist'}</span>
+                      <ChevronDown size={14} />
+                    </button>
                   
                   {showWatchlistDropdown && (
                     <div style={{ 

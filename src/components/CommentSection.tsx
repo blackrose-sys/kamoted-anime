@@ -13,6 +13,13 @@ interface Comment {
   avatar_url: string | null;
   content: string;
   created_at: string;
+  timestamp_sec?: number | null;
+}
+
+function formatTimestamp(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
 interface CommentSectionProps {
@@ -82,6 +89,10 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<'newest' | 'timestamp'>('newest');
+  const [attachTimestamp, setAttachTimestamp] = useState(false);
+  const [minutes, setMinutes] = useState('');
+  const [seconds, setSeconds] = useState('');
   const listRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -92,12 +103,19 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
   const fetchComments = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('comments')
         .select('*')
         .eq('anime_id', numericAnimeId)
-        .eq('episode', episode)
-        .order('created_at', { ascending: false });
+        .eq('episode', episode);
+
+      if (sortBy === 'timestamp') {
+        query = query.order('timestamp_sec', { ascending: true, nullsFirst: false }).order('created_at', { ascending: false });
+      } else {
+        query = query.order('created_at', { ascending: false });
+      }
+
+      const { data, error } = await query;
 
       if (!error && data) {
         setComments(data as Comment[]);
@@ -107,9 +125,9 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
     } finally {
       setLoading(false);
     }
-  }, [numericAnimeId, episode]);
+  }, [numericAnimeId, episode, sortBy]);
 
-  // Load comments when anime/episode changes
+  // Load comments when anime/episode/sortBy changes
   useEffect(() => {
     fetchComments();
   }, [fetchComments]);
@@ -172,6 +190,14 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
     if (!user || !newComment.trim() || posting) return;
 
     setPosting(true);
+    
+    let timestamp_sec: number | null = null;
+    if (attachTimestamp) {
+      const m = parseInt(minutes) || 0;
+      const s = parseInt(seconds) || 0;
+      timestamp_sec = m * 60 + s;
+    }
+
     try {
       const { error } = await supabase.from('comments').insert({
         user_id: user.id,
@@ -180,6 +206,7 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
         username: user.username,
         avatar_url: user.avatar_url || null,
         content: newComment.trim(),
+        timestamp_sec
       });
 
       if (error) {
@@ -189,6 +216,9 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
       }
 
       setNewComment('');
+      setMinutes('');
+      setSeconds('');
+      setAttachTimestamp(false);
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
       }
@@ -273,19 +303,42 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
             </span>
           </div>
         </div>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.4rem',
-          padding: '0.35rem 0.75rem',
-          borderRadius: '2rem',
-          backgroundColor: 'rgba(245, 158, 11, 0.1)',
-          border: '1px solid rgba(245, 158, 11, 0.2)',
-        }}>
-          <MessageCircle size={14} color="var(--accent-primary)" />
-          <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--accent-primary)' }}>
-            {comments.length}
-          </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '0.35rem 0.75rem',
+            borderRadius: '2rem',
+            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+            border: '1px solid rgba(245, 158, 11, 0.2)',
+          }}>
+            <MessageCircle size={14} color="var(--accent-primary)" />
+            <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--accent-primary)', marginLeft: '0.25rem' }}>
+              {comments.length}
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+            <select 
+              value={sortBy} 
+              onChange={(e) => setSortBy(e.target.value as 'newest' | 'timestamp')}
+              style={{ 
+                backgroundColor: 'var(--bg-color-tertiary)', 
+                color: 'white', 
+                border: '1px solid var(--border-color)', 
+                borderRadius: '0.4rem', 
+                padding: '0.25rem 0.5rem', 
+                fontSize: '0.72rem', 
+                fontWeight: 800,
+                outline: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              <option value="newest">Newest First</option>
+              <option value="timestamp">Episode Time</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -455,6 +508,45 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
             </span>
           </div>
         )}
+
+        {/* Attach timestamp inputs */}
+        {user && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem', paddingLeft: '52px', flexWrap: 'wrap' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700, color: attachTimestamp ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
+              <input 
+                type="checkbox" 
+                checked={attachTimestamp} 
+                onChange={(e) => setAttachTimestamp(e.target.checked)} 
+                style={{ cursor: 'pointer', accentColor: 'var(--accent-primary)' }}
+              />
+              Attach episode time
+            </label>
+            
+            {attachTimestamp && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                <input 
+                  type="number" 
+                  min="0"
+                  max="500"
+                  placeholder="MM"
+                  value={minutes}
+                  onChange={(e) => setMinutes(e.target.value)}
+                  style={{ width: '45px', padding: '0.2rem', borderRadius: '0.35rem', backgroundColor: 'var(--bg-color-tertiary)', border: '1px solid var(--border-color)', color: 'white', textAlign: 'center', fontSize: '0.75rem', outline: 'none' }}
+                />
+                <span style={{ color: 'var(--text-secondary)', fontWeight: 800 }}>:</span>
+                <input 
+                  type="number" 
+                  min="0"
+                  max="59"
+                  placeholder="SS"
+                  value={seconds}
+                  onChange={(e) => setSeconds(e.target.value)}
+                  style={{ width: '45px', padding: '0.2rem', borderRadius: '0.35rem', backgroundColor: 'var(--bg-color-tertiary)', border: '1px solid var(--border-color)', color: 'white', textAlign: 'center', fontSize: '0.75rem', outline: 'none' }}
+                />
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Comment List */}
@@ -619,6 +711,19 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
                       <Clock size={10} />
                       {getRelativeTime(comment.created_at)}
                     </span>
+                    {comment.timestamp_sec !== null && comment.timestamp_sec !== undefined && (
+                      <span style={{
+                        fontSize: '0.7rem',
+                        fontWeight: 800,
+                        padding: '0.1rem 0.4rem',
+                        borderRadius: '0.25rem',
+                        backgroundColor: 'rgba(139, 92, 246, 0.15)',
+                        color: '#a78bfa',
+                        border: '1px solid rgba(139, 92, 246, 0.2)'
+                      }}>
+                        at {formatTimestamp(comment.timestamp_sec)}
+                      </span>
+                    )}
                   </div>
                   <p style={{
                     fontSize: '0.875rem',

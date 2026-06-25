@@ -10,6 +10,9 @@ import { Verify } from './pages/Verify';
 import { Profile } from './pages/Profile';
 import { UserProfile } from './pages/UserProfile';
 import { Calendar } from './pages/Calendar';
+import { News } from './pages/News';
+import { WatchRoom } from './pages/WatchRoom';
+import { Lists } from './pages/Lists';
 import { AuthProvider } from './context/AuthContext';
 
 function App() {
@@ -28,6 +31,9 @@ function App() {
             <Route path="/profile" element={<Profile />} />
             <Route path="/user/:username" element={<UserProfile />} />
             <Route path="/calendar" element={<Calendar />} />
+            <Route path="/news" element={<News />} />
+            <Route path="/lists" element={<Lists />} />
+            <Route path="/room/:roomId" element={<WatchRoom />} />
           </Routes>
           <Footer />
         </div>

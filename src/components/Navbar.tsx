@@ -1,4 +1,4 @@
-import { Tv, Search, Check, LogOut, User as UserIcon, Calendar } from 'lucide-react';
+import { Tv, Search, Check, LogOut, User as UserIcon, Calendar, Newspaper, List } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -55,6 +55,26 @@ export function Navbar() {
               <Calendar size={15} />
               <span className="hidden sm:inline">Calendar</span>
             </Link>
+            <Link
+              to="/news"
+              className="flex items-center gap-2"
+              style={{ transition: 'color 0.2s' }}
+              onMouseOver={e => (e.currentTarget as HTMLAnchorElement).style.color = 'white'}
+              onMouseOut={e => (e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.5)'}
+            >
+              <Newspaper size={15} />
+              <span className="hidden sm:inline">News</span>
+            </Link>
+            <Link
+              to="/lists"
+              className="flex items-center gap-2"
+              style={{ transition: 'color 0.2s' }}
+              onMouseOver={e => (e.currentTarget as HTMLAnchorElement).style.color = 'white'}
+              onMouseOut={e => (e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.5)'}
+            >
+              <List size={15} />
+              <span className="hidden sm:inline">Playlists</span>
+            </Link>
           </div>
 
           {/* Discord Button — premium pill */}
@@ -62,41 +82,46 @@ export function Navbar() {
             onClick={handleCopy}
             title={copied ? 'Discord ID Copied!' : 'Copy Discord ID: kamotedelight'}
             style={{
-              display: 'flex', alignItems: 'center', gap: '0.45rem',
-              padding: '0.42rem 0.85rem',
+              display: 'flex', alignItems: 'center', gap: '0.5rem',
+              padding: '0.45rem 1rem',
               borderRadius: '9999px',
               background: copied
-                ? 'linear-gradient(135deg, rgba(34,197,94,0.15), rgba(34,197,94,0.08))'
-                : 'linear-gradient(135deg, rgba(88,101,242,0.18), rgba(88,101,242,0.08))',
-              border: `1px solid ${copied ? 'rgba(34,197,94,0.35)' : 'rgba(88,101,242,0.4)'}`,
-              color: copied ? '#4ade80' : '#959cf7',
+                ? 'linear-gradient(135deg, rgba(34,197,94,0.3), rgba(34,197,94,0.15))'
+                : 'linear-gradient(135deg, rgba(88,101,242,0.45), rgba(88,101,242,0.25))',
+              border: `1px solid ${copied ? '#22c55e' : '#5865f2'}`,
+              color: 'white', // extremely visible
               cursor: 'pointer',
-              fontSize: '0.72rem', fontWeight: 800,
-              textTransform: 'uppercase', letterSpacing: '0.06em',
+              fontSize: '0.75rem', fontWeight: 900,
+              textTransform: 'uppercase', letterSpacing: '0.08em',
               transition: 'all 0.25s cubic-bezier(0.4,0,0.2,1)',
               boxShadow: copied
-                ? '0 0 12px rgba(34,197,94,0.2)'
-                : '0 0 12px rgba(88,101,242,0.15)',
-              whiteSpace: 'nowrap'
+                ? '0 0 15px rgba(34,197,94,0.45)'
+                : '0 0 15px rgba(88,101,242,0.4)',
+              whiteSpace: 'nowrap',
+              textShadow: '0 1px 2px rgba(0,0,0,0.5)'
             }}
             onMouseOver={e => {
-              if (!copied) {
-                const b = e.currentTarget as HTMLButtonElement;
-                b.style.background = 'linear-gradient(135deg, rgba(88,101,242,0.28), rgba(88,101,242,0.14))';
-                b.style.borderColor = 'rgba(88,101,242,0.65)';
-                b.style.color = '#c9cbff';
-                b.style.boxShadow = '0 0 20px rgba(88,101,242,0.3)';
-                b.style.transform = 'translateY(-1px)';
+              const b = e.currentTarget as HTMLButtonElement;
+              if (copied) {
+                b.style.background = 'linear-gradient(135deg, rgba(34,197,94,0.45), rgba(34,197,94,0.25))';
+                b.style.boxShadow = '0 0 25px rgba(34,197,94,0.7)';
+              } else {
+                b.style.background = 'linear-gradient(135deg, rgba(88,101,242,0.6), rgba(88,101,242,0.4))';
+                b.style.borderColor = '#7289da';
+                b.style.boxShadow = '0 0 25px rgba(88,101,242,0.65)';
               }
+              b.style.transform = 'translateY(-1.5px)';
             }}
             onMouseOut={e => {
-              if (!copied) {
-                const b = e.currentTarget as HTMLButtonElement;
-                b.style.background = 'linear-gradient(135deg, rgba(88,101,242,0.18), rgba(88,101,242,0.08))';
-                b.style.borderColor = 'rgba(88,101,242,0.4)';
-                b.style.color = '#959cf7';
-                b.style.boxShadow = '0 0 12px rgba(88,101,242,0.15)';
-                b.style.transform = 'translateY(0)';
+              const b = e.currentTarget as HTMLButtonElement;
+              b.style.transform = 'translateY(0)';
+              if (copied) {
+                b.style.background = 'linear-gradient(135deg, rgba(34,197,94,0.3), rgba(34,197,94,0.15))';
+                b.style.boxShadow = '0 0 15px rgba(34,197,94,0.45)';
+              } else {
+                b.style.background = 'linear-gradient(135deg, rgba(88,101,242,0.45), rgba(88,101,242,0.25))';
+                b.style.borderColor = '#5865f2';
+                b.style.boxShadow = '0 0 15px rgba(88,101,242,0.4)';
               }
             }}
           >

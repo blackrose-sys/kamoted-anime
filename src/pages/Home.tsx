@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Hero } from '../components/Hero';
+import { QuizModal } from '../components/QuizModal';
 import { AnimeCard } from '../components/AnimeCard';
 import type { AnimeData } from '../components/AnimeCard';
 import { supabase } from '../lib/supabase';
@@ -54,6 +55,8 @@ export function Home() {
   const [recentlyUpdated, setRecentlyUpdated] = useState<AnimeData[]>([]);
   const [topAnime, setTopAnime] = useState<AnimeData[]>([]);
   const [history, setHistory] = useState<any[]>([]);
+  const [friendActivity, setFriendActivity] = useState<any[]>([]);
+  const [showQuiz, setShowQuiz] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
@@ -275,18 +278,63 @@ export function Home() {
     fetchAnimeData();
   }, [fetchAnimeData]);
 
-  // Fetch user history SEPARATELY
+  // Fetch user history & preferences & friends activity
   useEffect(() => {
     if (!user) {
       setHistory([]);
+      setFriendActivity([]);
       return;
     }
+    
+    // 1. Get user watch history
     supabase.from('watch_history')
       .select('*')
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false })
       .limit(6)
       .then(({ data }) => setHistory(data || []));
+
+    // 2. Check if genre preferences exist, else show Quiz
+    supabase.from('profiles')
+      .select('genre_prefs')
+      .eq('id', user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data && (!data.genre_prefs || (Array.isArray(data.genre_prefs) && data.genre_prefs.length === 0) || Object.keys(data.genre_prefs).length === 0)) {
+          setShowQuiz(true);
+        }
+      });
+
+    // 3. Get followed users recent activity
+    supabase.from('follows')
+      .select('following_id')
+      .eq('follower_id', user.id)
+      .then(async ({ data: followsData }) => {
+        const followingIds = followsData?.map(f => f.following_id) || [];
+        if (followingIds.length > 0) {
+          const { data: historyItems } = await supabase
+            .from('watch_history')
+            .select('*')
+            .in('user_id', followingIds)
+            .order('updated_at', { ascending: false })
+            .limit(5);
+
+          if (historyItems && historyItems.length > 0) {
+            const userIds = Array.from(new Set(historyItems.map(item => item.user_id)));
+            const { data: userProfiles } = await supabase
+              .from('profiles')
+              .select('id, username, avatar_url')
+              .in('id', userIds);
+
+            const profileMap = new Map(userProfiles?.map(p => [p.id, p]) || []);
+            const enriched = historyItems.map(item => ({
+              ...item,
+              profile: profileMap.get(item.user_id) || { username: 'Otaku', avatar_url: null }
+            }));
+            setFriendActivity(enriched);
+          }
+        }
+      });
   }, [user]);
 
   return (
@@ -383,8 +431,10 @@ export function Home() {
         </div>
 
         {/* Sidebar */}
-        <aside style={{ flex: '1 1 25%', minWidth: '300px' }}>
-          <div style={{ backgroundColor: 'var(--bg-color-secondary)', borderRadius: '1rem', padding: '1.5rem', border: '1px solid var(--border-color)', position: 'sticky', top: 'calc(var(--nav-height) + 1rem)' }}>
+        <aside style={{ flex: '1 1 25%', minWidth: '300px', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          
+          {/* Top Anime Card */}
+          <div style={{ backgroundColor: 'var(--bg-color-secondary)', borderRadius: '1rem', padding: '1.5rem', border: '1px solid var(--border-color)' }}>
             <h2 style={{ fontSize: '1.25rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '-0.05em', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '1rem' }}>Top Anime</h2>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -408,10 +458,69 @@ export function Home() {
               )}
             </div>
           </div>
+
+          {/* Friends Activity Widget */}
+          {user && friendActivity.length > 0 && (
+            <div style={{ backgroundColor: 'var(--bg-color-secondary)', borderRadius: '1rem', padding: '1.5rem', border: '1px solid var(--border-color)' }}>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '-0.05em', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                👥 Friends Activity
+              </h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                {friendActivity.map((activity, idx) => (
+                  <div key={`act-${activity.id}-${idx}`} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+                    <Link to={`/user/${activity.profile.username}`} style={{ textDecoration: 'none' }}>
+                      <div style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, var(--accent-primary), #8b5cf6)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 900,
+                        fontSize: '0.75rem',
+                        color: 'white',
+                        overflow: 'hidden'
+                      }}>
+                        {activity.profile.avatar_url ? (
+                          <img src={activity.profile.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          activity.profile.username.charAt(0).toUpperCase()
+                        )}
+                      </div>
+                    </Link>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '0.8rem', lineHeight: 1.3 }}>
+                        <Link to={`/user/${activity.profile.username}`} style={{ color: 'var(--accent-primary)', fontWeight: 800, textDecoration: 'none' }} className="hover-underline">
+                          {activity.profile.username}
+                        </Link>{' '}
+                        <span style={{ color: 'var(--text-secondary)' }}>watched EP</span>{' '}
+                        <span style={{ color: 'white', fontWeight: 700 }}>{activity.last_episode}</span>{' '}
+                        <span style={{ color: 'var(--text-secondary)' }}>of</span>
+                      </div>
+                      <Link to={`/watch/${activity.anime_id}`} style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', textDecoration: 'none', marginTop: '0.15rem' }} className="hover-underline">
+                        {activity.title}
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </aside>
 
       </div>
       <ChatSidebar />
+
+      {showQuiz && (
+        <QuizModal 
+          onClose={() => setShowQuiz(false)} 
+          onComplete={(prefs) => {
+            setShowQuiz(false);
+            console.log('Quiz completed with prefs:', prefs);
+          }} 
+        />
+      )}
     </main>
   );
 }

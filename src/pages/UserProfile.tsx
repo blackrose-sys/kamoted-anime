@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { AnimeCard } from '../components/AnimeCard';
-import { Loader2, Bookmark, Calendar, Lock, Globe, ChevronLeft } from 'lucide-react';
+import { Loader2, Bookmark, Calendar, Lock, Globe, ChevronLeft, UserPlus, UserCheck, Flame } from 'lucide-react';
 
 interface ProfileData {
   id: string;
@@ -63,6 +63,11 @@ export function UserProfile() {
     badges: [] as { id: string; name: string; description: string; icon: string; unlocked: boolean }[]
   });
   const [statsLoading, setStatsLoading] = useState(true);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followerCount, setFollowerCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [followLoading, setFollowLoading] = useState(false);
+  const [streakCount, setStreakCount] = useState(0);
 
   const isOwnProfile = currentUser && profile && currentUser.id === profile.id;
 
@@ -138,6 +143,35 @@ export function UserProfile() {
           setStatsLoading(false);
         }
 
+        // Fetch follow and streak info
+        try {
+          setStreakCount(profileData.streak_count || 0);
+
+          const { count: followers } = await supabase
+            .from('follows')
+            .select('*', { count: 'exact', head: true })
+            .eq('following_id', profileData.id);
+          setFollowerCount(followers || 0);
+
+          const { count: following } = await supabase
+            .from('follows')
+            .select('*', { count: 'exact', head: true })
+            .eq('follower_id', profileData.id);
+          setFollowingCount(following || 0);
+
+          if (currentUser && currentUser.id !== profileData.id) {
+            const { data: followRecord } = await supabase
+              .from('follows')
+              .select('*')
+              .eq('follower_id', currentUser.id)
+              .eq('following_id', profileData.id)
+              .maybeSingle();
+            setIsFollowing(!!followRecord);
+          }
+        } catch (err) {
+          console.error('Failed to load follow / streak details:', err);
+        }
+
         // 2. Determine if we can read their watchlist
         const canReadWatchlist = 
           profileData.watchlist_privacy === 'public' || 
@@ -165,6 +199,39 @@ export function UserProfile() {
 
     fetchProfileAndWatchlist();
   }, [username, currentUser]);
+
+  const handleToggleFollow = async () => {
+    if (!currentUser) return alert('Please login to follow users!');
+    if (!profile || followLoading) return;
+
+    setFollowLoading(true);
+    try {
+      if (isFollowing) {
+        const { error } = await supabase
+          .from('follows')
+          .delete()
+          .eq('follower_id', currentUser.id)
+          .eq('following_id', profile.id);
+        if (error) throw error;
+        setIsFollowing(false);
+        setFollowerCount(prev => Math.max(0, prev - 1));
+      } else {
+        const { error } = await supabase
+          .from('follows')
+          .insert({
+            follower_id: currentUser.id,
+            following_id: profile.id
+          });
+        if (error) throw error;
+        setIsFollowing(true);
+        setFollowerCount(prev => prev + 1);
+      }
+    } catch (err) {
+      console.error('Failed to toggle follow status:', err);
+    } finally {
+      setFollowLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -286,9 +353,80 @@ export function UserProfile() {
                     <Lock size={16} color="#fca5a5" />
                     <span>Watchlist is Private</span>
                   </>
-                )}
+                )
+                }
               </div>
             </div>
+
+            {/* Streak & Follows details */}
+            <div style={{ marginTop: '0.75rem', display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
+              {streakCount > 0 && (
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                  padding: '0.2rem 0.5rem',
+                  borderRadius: '0.5rem',
+                  color: '#f87171',
+                  fontSize: '0.75rem',
+                  fontWeight: 800
+                }}>
+                  <Flame size={14} fill="#ef4444" />
+                  <span>{streakCount} DAY WATCH STREAK</span>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '1rem', fontSize: '0.85rem' }}>
+                <div>
+                  <span style={{ color: 'white', fontWeight: 800 }}>{followerCount}</span>{' '}
+                  <span style={{ color: 'var(--text-secondary)' }}>followers</span>
+                </div>
+                <div>
+                  <span style={{ color: 'white', fontWeight: 800 }}>{followingCount}</span>{' '}
+                  <span style={{ color: 'var(--text-secondary)' }}>following</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Follow Action Button */}
+            {!isOwnProfile && currentUser && (
+              <button
+                onClick={handleToggleFollow}
+                disabled={followLoading}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.4rem 1.25rem',
+                  borderRadius: '0.5rem',
+                  backgroundColor: isFollowing ? 'transparent' : 'var(--accent-primary)',
+                  color: isFollowing ? 'white' : 'black',
+                  border: isFollowing ? '1px solid var(--border-color)' : 'none',
+                  fontWeight: 800,
+                  fontSize: '0.8rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  marginTop: '0.75rem'
+                }}
+                className="hover-scale"
+              >
+                {followLoading ? (
+                  <Loader2 className="animate-spin" size={14} />
+                ) : isFollowing ? (
+                  <>
+                    <UserCheck size={14} />
+                    Unfollow
+                  </>
+                ) : (
+                  <>
+                    <UserPlus size={14} />
+                    Follow
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
 

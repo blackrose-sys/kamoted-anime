@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Navigate, Link } from 'react-router-dom';
-import { Loader2, Bookmark, Clock, Trash2, Play, Camera, X, Check, Save, User, Mail, ZoomIn, ZoomOut, Globe, Lock } from 'lucide-react';
+import { Loader2, Bookmark, Clock, Trash2, Play, Camera, X, Check, Save, User, Mail, ZoomIn, ZoomOut, Globe, Lock, List } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 export function Profile() {
   const { user, updateUser, isLoading } = useAuth();
   
   // Tab management
-  const [activeTab, setActiveTab] = useState<'settings' | 'watchlist' | 'history'>('settings');
+  const [activeTab, setActiveTab] = useState<'settings' | 'watchlist' | 'history' | 'lists'>('settings');
   const [watchlist, setWatchlist] = useState<any[]>([]);
   const [history, setHistory] = useState<any[]>([]);
+  const [myLists, setMyLists] = useState<any[]>([]);
   const [selectedWatchlistCategory, setSelectedWatchlistCategory] = useState<string>('all');
 
   // Gamification state
@@ -109,6 +110,16 @@ export function Profile() {
       } else if (activeTab === 'history') {
         supabase.from('watch_history').select('*').eq('user_id', user.id).order('updated_at', { ascending: false })
           .then(({ data }) => setHistory(data || []));
+      } else if (activeTab === 'lists') {
+        supabase.from('anime_lists').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
+          .then(async ({ data }) => {
+            const lists = data || [];
+            for (const list of lists) {
+              const { data: items } = await supabase.from('anime_list_items').select('*').eq('list_id', list.id).order('position', { ascending: true });
+              list.items = items || [];
+            }
+            setMyLists(lists);
+          });
       }
     }
   }, [user, activeTab]);
@@ -344,6 +355,27 @@ export function Profile() {
           }}
         >
           <Clock size={16} /> HISTORY
+        </button>
+        <button 
+          onClick={() => setActiveTab('lists')} 
+          style={{ 
+            background: 'none', 
+            border: 'none', 
+            color: activeTab === 'lists' ? 'var(--accent-primary)' : 'var(--text-secondary)', 
+            fontWeight: 900, 
+            cursor: 'pointer', 
+            padding: '0.5rem 1rem', 
+            display: 'flex', 
+            alignItems: 'center',
+            gap: '0.5rem',
+            fontSize: '0.9rem',
+            letterSpacing: '0.05em',
+            transition: 'color 0.2s',
+            borderBottom: activeTab === 'lists' ? '2px solid var(--accent-primary)' : '2px solid transparent',
+            marginBottom: '-17px'
+          }}
+        >
+          <List size={16} /> PLAYLISTS
         </button>
       </div>
 
@@ -740,6 +772,57 @@ export function Profile() {
                       </div>
                     </div>
                   </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 4: CURATED PLAYLISTS */}
+        {activeTab === 'lists' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '-0.01em', margin: 0 }}>Curated Playlists</h2>
+              <Link to="/lists" className="btn-primary" style={{ display: 'inline-flex', alignItems: 'center', padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 800 }}>Create New</Link>
+            </div>
+            {myLists.length === 0 ? (
+              <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '4rem 2rem' }}>
+                <List size={40} style={{ color: 'var(--border-color)', marginBottom: '1rem' }} />
+                <div>You haven't created any custom playlists yet!</div>
+                <Link to="/lists" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 700, display: 'inline-block', marginTop: '1rem' }}>Create Playlist</Link>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                {myLists.map(list => (
+                  <div key={list.id} className="glass" style={{ border: '1px solid var(--border-color)', borderRadius: '1rem', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 850 }}>{list.title}</h3>
+                        <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{list.description || 'No description'}</p>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          if (confirm('Are you sure you want to delete this playlist?')) {
+                            await supabase.from('anime_lists').delete().eq('id', list.id);
+                            setMyLists(myLists.filter(l => l.id !== list.id));
+                          }
+                        }}
+                        style={{ backgroundColor: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                        onMouseOver={e => e.currentTarget.style.color = '#ef4444'}
+                        onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.75rem', overflowX: 'auto', paddingBottom: '0.25rem' }}>
+                      {list.items?.map((item: any) => (
+                        <div key={item.id} style={{ width: '80px', flexShrink: 0 }}>
+                          <img src={item.image_url} alt="" style={{ width: '100%', aspectRatio: '2/3', borderRadius: '0.25rem', objectFit: 'cover', border: '1px solid var(--border-color)' }} />
+                          <div style={{ fontSize: '0.65rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '0.25rem' }}>{item.title}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             )}

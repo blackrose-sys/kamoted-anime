@@ -189,3 +189,94 @@ CREATE POLICY "Users can update reactions on any message" ON public.chat_message
 -- Index for fast chat loads
 CREATE INDEX IF NOT EXISTS idx_chat_messages_created ON public.chat_messages(created_at DESC);
 
+
+-- ===================================================
+-- 8. New Feature Expansions (Wave 1, 2, 3)
+-- ===================================================
+
+-- Streak columns and preferences on profiles
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS streak_count INT DEFAULT 0;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS streak_last_date DATE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS genre_prefs JSONB DEFAULT '[]'::jsonb;
+
+-- Follows table
+CREATE TABLE IF NOT EXISTS public.follows (
+  follower_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  following_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (follower_id, following_id)
+);
+ALTER TABLE public.follows ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Follows viewable by all" ON public.follows;
+CREATE POLICY "Follows viewable by all" ON public.follows FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Users manage own follows" ON public.follows;
+CREATE POLICY "Users manage own follows" ON public.follows FOR ALL USING (auth.uid() = follower_id);
+
+-- Custom lists
+CREATE TABLE IF NOT EXISTS public.anime_lists (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  username TEXT NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  is_public BOOLEAN DEFAULT true,
+  likes INT DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.anime_list_items (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  list_id UUID REFERENCES public.anime_lists(id) ON DELETE CASCADE NOT NULL,
+  anime_id INT NOT NULL,
+  title TEXT NOT NULL,
+  image_url TEXT,
+  note TEXT,
+  position INT DEFAULT 0
+);
+
+ALTER TABLE public.anime_lists ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.anime_list_items ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Lists viewable if public" ON public.anime_lists;
+CREATE POLICY "Lists viewable if public" ON public.anime_lists FOR SELECT USING (is_public OR auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users manage own lists" ON public.anime_lists;
+CREATE POLICY "Users manage own lists" ON public.anime_lists FOR ALL USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "List items viewable by all" ON public.anime_list_items;
+CREATE POLICY "List items viewable by all" ON public.anime_list_items FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Users manage own list items" ON public.anime_list_items;
+CREATE POLICY "Users manage own list items" ON public.anime_list_items FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.anime_lists WHERE id = list_id AND user_id = auth.uid())
+);
+
+-- Timestamped comments
+ALTER TABLE public.comments ADD COLUMN IF NOT EXISTS timestamp_sec INT;
+
+-- Watch rooms
+CREATE TABLE IF NOT EXISTS public.watch_rooms (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  room_code TEXT UNIQUE NOT NULL,
+  host_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  anime_id INT NOT NULL,
+  episode INT NOT NULL DEFAULT 1,
+  is_playing BOOLEAN DEFAULT false,
+  current_time FLOAT DEFAULT 0,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.watch_rooms ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Watch rooms viewable by all" ON public.watch_rooms;
+CREATE POLICY "Watch rooms viewable by all" ON public.watch_rooms FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Anyone can create rooms" ON public.watch_rooms;
+CREATE POLICY "Anyone can create rooms" ON public.watch_rooms FOR INSERT WITH CHECK (auth.uid() = host_id);
+
+DROP POLICY IF EXISTS "Host can update room" ON public.watch_rooms;
+CREATE POLICY "Host can update room" ON public.watch_rooms FOR UPDATE USING (auth.uid() = host_id);
+
+

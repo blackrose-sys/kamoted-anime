@@ -168,15 +168,16 @@ export function Browse() {
           setHasNextPage(data.pagination?.has_next_page || false);
         } else {
           // Discover tab - search + genre filter
-          let url = 'https://api.jikan.moe/v4/anime?sfw=true&limit=24';
-          url += `&page=${page}`;
+          let url = 'https://api.jikan.moe/v4/anime?limit=24';
           
           if (query.trim()) {
             url += `&q=${encodeURIComponent(query)}`;
           } else {
-            url += '&order_by=popularity&sort=asc';
+            // Keep it safe when just browsing the list without searching
+            url += '&order_by=popularity&sort=asc&sfw=true';
           }
           
+          url += `&page=${page}`;
           if (genre) url += `&genres=${genre}`;
 
           const res = await fetch(url);

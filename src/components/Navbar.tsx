@@ -34,11 +34,10 @@ export function Navbar() {
 
         <div className="flex items-center gap-4">
           {/* Nav Links */}
-          <div className="flex items-center gap-5" style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.5)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.75rem', fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
             <Link
               to="/browse"
-              className="flex items-center gap-2"
-              style={{ transition: 'color 0.2s' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', textDecoration: 'none', transition: 'color 0.2s', color: 'rgba(255,255,255,0.5)' }}
               onMouseOver={e => (e.currentTarget as HTMLAnchorElement).style.color = 'white'}
               onMouseOut={e => (e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.5)'}
             >
@@ -47,8 +46,7 @@ export function Navbar() {
             </Link>
             <Link
               to="/calendar"
-              className="flex items-center gap-2"
-              style={{ transition: 'color 0.2s' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', textDecoration: 'none', transition: 'color 0.2s', color: 'rgba(255,255,255,0.5)' }}
               onMouseOver={e => (e.currentTarget as HTMLAnchorElement).style.color = 'white'}
               onMouseOut={e => (e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.5)'}
             >
@@ -57,8 +55,7 @@ export function Navbar() {
             </Link>
             <Link
               to="/news"
-              className="flex items-center gap-2"
-              style={{ transition: 'color 0.2s' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', textDecoration: 'none', transition: 'color 0.2s', color: 'rgba(255,255,255,0.5)' }}
               onMouseOver={e => (e.currentTarget as HTMLAnchorElement).style.color = 'white'}
               onMouseOut={e => (e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.5)'}
             >
@@ -67,8 +64,7 @@ export function Navbar() {
             </Link>
             <Link
               to="/lists"
-              className="flex items-center gap-2"
-              style={{ transition: 'color 0.2s' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', textDecoration: 'none', transition: 'color 0.2s', color: 'rgba(255,255,255,0.5)' }}
               onMouseOver={e => (e.currentTarget as HTMLAnchorElement).style.color = 'white'}
               onMouseOut={e => (e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.5)'}
             >

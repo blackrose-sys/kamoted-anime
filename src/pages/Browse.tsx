@@ -51,38 +51,74 @@ export function Browse() {
       setLoading(true);
       try {
         if (activeTab === 'recent') {
-          // Fetch recently updated episodes
-          const res = await fetch('https://api.jikan.moe/v4/watch/episodes');
-          const data = await res.json();
-          const watchEpisodes = (data.data || [])
-            .filter((item: any) => {
-              if (item.region_locked) return false;
-              const imgUrl = item.entry?.images?.jpg?.image_url || '';
-              if (imgUrl.includes('icon-banned') || imgUrl.includes('na.gif')) return false;
-              return true;
+          const query = `
+            query ($airingAtGreater: Int, $airingAtLesser: Int) {
+              Page(page: 1, perPage: 50) {
+                airingSchedules(airingAt_greater: $airingAtGreater, airingAt_lesser: $airingAtLesser, sort: TIME_DESC) {
+                  episode
+                  media {
+                    idMal
+                    title {
+                      romaji
+                      english
+                      userPreferred
+                    }
+                    coverImage {
+                      large
+                    }
+                    averageScore
+                    seasonYear
+                  }
+                }
+              }
+            }
+          `;
+
+          const now = Math.floor(Date.now() / 1000);
+          const sevenDaysAgo = now - (7 * 24 * 60 * 60);
+
+          const response = await fetch('https://graphql.anilist.co', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              query,
+              variables: {
+                airingAtGreater: sevenDaysAgo,
+                airingAtLesser: now
+              }
             })
-            .map((item: any) => ({
-              mal_id: item.entry.mal_id,
-              title: item.entry.title,
-              images: item.entry.images,
-              score: null,
-              year: null,
-              episodes: item.episodes && item.episodes.length > 0 
-                ? parseInt(item.episodes[0].title.replace(/\D/g, ''), 10) || null 
-                : null
+          });
+
+          const resData = await response.json();
+          const schedules = resData?.data?.Page?.airingSchedules || [];
+
+          const mapped = schedules
+            .filter((s: any) => s.media && s.media.idMal)
+            .map((s: any) => ({
+              mal_id: s.media.idMal,
+              title: s.media.title.english || s.media.title.userPreferred || s.media.title.romaji,
+              images: {
+                jpg: {
+                  image_url: s.media.coverImage.large,
+                  large_image_url: s.media.coverImage.large
+                }
+              },
+              score: s.media.averageScore ? s.media.averageScore / 10 : null,
+              year: s.media.seasonYear || null,
+              episodes: s.episode
             }));
 
           // Deduplicate
           const seenIds = new Set<number>();
           const uniqueRecent: AnimeData[] = [];
-          for (const anime of watchEpisodes) {
+          for (const anime of mapped) {
             if (!seenIds.has(anime.mal_id)) {
               seenIds.add(anime.mal_id);
               uniqueRecent.push(anime);
             }
           }
 
-          // Fetch current season airing shows to pad up to 24
+          // Fetch current season airing shows to pad up to 24 if needed
           const seasonRes = await fetch('https://api.jikan.moe/v4/seasons/now?limit=24');
           const seasonData = await seasonRes.json();
           const seasonFiltered = (seasonData.data || []).filter((anime: any) => {
@@ -99,7 +135,7 @@ export function Browse() {
             }
           }
 
-          setResults(combined);
+          setResults(combined.slice(0, 24));
           setHasNextPage(false);
         } else if (activeTab === 'season') {
           // Fetch current season anime with pagination

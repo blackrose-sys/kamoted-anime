@@ -91,28 +91,67 @@ export function Home() {
       // 2. Recently updated (check cache first)
       let recentData = getCached<AnimeData[]>('home_recent');
       if (!recentData) {
-        const res = await fetchWithRetry('https://api.jikan.moe/v4/watch/episodes');
-        const watchEpisodes = (res.data || [])
-          .filter((item: any) => {
-            if (item.region_locked) return false;
-            const imgUrl = item.entry?.images?.jpg?.image_url || '';
-            return !imgUrl.includes('icon-banned') && !imgUrl.includes('na.gif');
+        const query = `
+          query ($airingAtGreater: Int, $airingAtLesser: Int) {
+            Page(page: 1, perPage: 50) {
+              airingSchedules(airingAt_greater: $airingAtGreater, airingAt_lesser: $airingAtLesser, sort: TIME_DESC) {
+                episode
+                media {
+                  idMal
+                  title {
+                    romaji
+                    english
+                    userPreferred
+                  }
+                  coverImage {
+                    large
+                  }
+                  averageScore
+                  seasonYear
+                }
+              }
+            }
+          }
+        `;
+
+        const now = Math.floor(Date.now() / 1000);
+        const sevenDaysAgo = now - (7 * 24 * 60 * 60);
+
+        const response = await fetch('https://graphql.anilist.co', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query,
+            variables: {
+              airingAtGreater: sevenDaysAgo,
+              airingAtLesser: now
+            }
           })
-          .map((item: any) => ({
-            mal_id: item.entry.mal_id,
-            title: item.entry.title,
-            images: item.entry.images,
-            score: null,
-            year: null,
-            episodes: item.episodes?.length > 0
-              ? parseInt(item.episodes[0].title.replace(/\D/g, ''), 10) || null
-              : null
+        });
+
+        const resData = await response.json();
+        const schedules = resData?.data?.Page?.airingSchedules || [];
+
+        const mapped = schedules
+          .filter((s: any) => s.media && s.media.idMal)
+          .map((s: any) => ({
+            mal_id: s.media.idMal,
+            title: s.media.title.english || s.media.title.userPreferred || s.media.title.romaji,
+            images: {
+              jpg: {
+                image_url: s.media.coverImage.large,
+                large_image_url: s.media.coverImage.large
+              }
+            },
+            score: s.media.averageScore ? s.media.averageScore / 10 : null,
+            year: s.media.seasonYear || null,
+            episodes: s.episode
           }));
 
         // Deduplicate recent episodes
         const seenIds = new Set<number>();
         const uniqueRecent: AnimeData[] = [];
-        for (const anime of watchEpisodes) {
+        for (const anime of mapped) {
           if (!seenIds.has(anime.mal_id)) {
             seenIds.add(anime.mal_id);
             uniqueRecent.push(anime);
@@ -130,7 +169,7 @@ export function Home() {
           }
         }
 
-        recentData = combined;
+        recentData = combined.slice(0, 24);
         setCache('home_recent', recentData);
       }
       setRecentlyUpdated(recentData || []);

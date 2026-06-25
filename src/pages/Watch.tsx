@@ -4,6 +4,7 @@ import { ArrowLeft, Search, ChevronDown, BookmarkPlus, BookmarkCheck, Server, Sk
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { animeServers, getServerUrl, fetchAniListMetadata, type AnimeServer } from '../lib/animeServers';
+import { CommentSection } from '../components/CommentSection';
 
 export function Watch() {
   const { id } = useParams<{ id: string }>();
@@ -541,6 +542,11 @@ export function Watch() {
                   ))}
                 </div>
               </div>
+
+              {/* Comment Section */}
+              {id && (
+                <CommentSection animeId={id} episode={selectedEpisode} />
+              )}
             </div>
           </div>
         </div>

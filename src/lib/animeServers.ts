@@ -42,17 +42,22 @@ export const animeServers: AnimeServer[] = [
   },
 ];
 
+export interface AniListMetadata {
+  anilistId: string | null;
+  episodes: number | null;
+  status: string | null;
+}
+
 /**
- * Convert MAL ID to AniList ID using AniList GraphQL API.
- * Caches results in sessionStorage so we only query once per anime.
+ * Fetch metadata and real-time episode counts from AniList.
  */
-export async function convertMalToAnilist(malId: string): Promise<string | null> {
-  const cacheKey = `anilist_id_${malId}`;
+export async function fetchAniListMetadata(malId: string): Promise<AniListMetadata> {
+  const cacheKey = `anilist_metadata_${malId}`;
   
   // Check cache first
   try {
     const cached = sessionStorage.getItem(cacheKey);
-    if (cached) return cached;
+    if (cached) return JSON.parse(cached);
   } catch { /* ignore */ }
 
   try {
@@ -60,6 +65,11 @@ export async function convertMalToAnilist(malId: string): Promise<string | null>
       query ($malId: Int) {
         Media(idMal: $malId, type: ANIME) {
           id
+          status
+          episodes
+          nextAiringEpisode {
+            episode
+          }
         }
       }
     `;
@@ -71,18 +81,38 @@ export async function convertMalToAnilist(malId: string): Promise<string | null>
     });
     
     const data = await response.json();
-    const anilistId = data?.data?.Media?.id?.toString() || null;
+    const media = data?.data?.Media;
     
-    // Cache the result
-    if (anilistId) {
-      try { sessionStorage.setItem(cacheKey, anilistId); } catch { /* ignore */ }
+    const anilistId = media?.id?.toString() || null;
+    let episodes = media?.episodes || null;
+    
+    // For ongoing releasing shows, nextAiringEpisode.episode - 1 gives the exact current released episode
+    if (media?.status === 'RELEASING' && media?.nextAiringEpisode?.episode) {
+      episodes = media.nextAiringEpisode.episode - 1;
     }
     
-    return anilistId;
+    const metadata = {
+      anilistId,
+      episodes,
+      status: media?.status || null
+    };
+    
+    // Cache the result
+    try { sessionStorage.setItem(cacheKey, JSON.stringify(metadata)); } catch { /* ignore */ }
+    
+    return metadata;
   } catch (error) {
-    console.error('Failed to convert MAL to AniList ID:', error);
-    return null;
+    console.error('Failed to fetch AniList metadata:', error);
+    return { anilistId: null, episodes: null, status: null };
   }
+}
+
+/**
+ * Convert MAL ID to AniList ID using AniList GraphQL API (Legacy compatibility).
+ */
+export async function convertMalToAnilist(malId: string): Promise<string | null> {
+  const metadata = await fetchAniListMetadata(malId);
+  return metadata.anilistId;
 }
 
 export function getServerUrl(

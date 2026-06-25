@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Search, ChevronDown, BookmarkPlus, BookmarkCheck, Server, SkipForward, ChevronRight, ChevronLeft, ToggleLeft, ToggleRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { animeServers, getServerUrl, fetchEpisodesFromServer, convertMalToAnilist, type AnimeServer } from '../lib/animeServers';
+import { animeServers, getServerUrl, fetchAniListMetadata, type AnimeServer } from '../lib/animeServers';
 
 export function Watch() {
   const { id } = useParams<{ id: string }>();
@@ -15,6 +15,7 @@ export function Watch() {
   const [selectedEpisode, setSelectedEpisode] = useState<number>(1);
   const [type, setType] = useState<'sub' | 'dub'>('sub');
   const [anilistId, setAnilistId] = useState<string>('');
+  const [relations, setRelations] = useState<any[]>([]);
   
   const [inWatchlist, setInWatchlist] = useState(false);
   const [watchlistLoading, setWatchlistLoading] = useState(false);
@@ -32,13 +33,17 @@ export function Watch() {
     if (id) {
       const cacheBuster = Date.now();
       
-      // Get AniList ID conversion
-      convertMalToAnilist(id)
-        .then(aId => {
-          if (aId) setAnilistId(aId);
+      // 1. Fetch AniList Metadata (for exact real-time episode counts)
+      fetchAniListMetadata(id)
+        .then(metadata => {
+          if (metadata.anilistId) setAnilistId(metadata.anilistId);
+          if (metadata.episodes) {
+            setTotalEpisodes(metadata.episodes);
+          }
         })
         .catch(console.error);
 
+      // 2. Fetch Jikan Anime Details (for title, images, and fallback episodes)
       fetch(`https://api.jikan.moe/v4/anime/${id}?_=${cacheBuster}`)
         .then(res => res.json())
         .then(data => {
@@ -46,80 +51,49 @@ export function Watch() {
             setAnimeName(data.data.title);
             setAnimeImage(data.data.images?.webp?.large_image_url || '');
             
-            // Try to get AniList ID from the response (fallback)
+            // If AniList count didn't load, use this fallback
+            if (data.data.episodes) {
+              setTotalEpisodes(prev => prev || data.data.episodes);
+            }
+            
+            // Try to get AniList ID from url (secondary fallback)
             if (data.data.url) {
               const anilistMatch = data.data.url.match(/anilist\.co\/anime\/(\d+)/);
               if (anilistMatch) {
-                setAnilistId(anilistMatch[1]);
+                setAnilistId(prev => prev || anilistMatch[1]);
               }
             }
           }
         })
         .catch(console.error);
 
-      // Fetch from both AnimePlay and Jikan APIs and use the higher count
-      const fetchAllEpisodes = async () => {
-        // Fetch from AnimePlay API
-        let serverEpisodes: number | null = null;
-        try {
-          serverEpisodes = await fetchEpisodesFromServer(id);
-        } catch (error) {
-          console.error('Error fetching from AnimePlay API:', error);
-        }
-
-        // Fetch from Jikan API
-        let jikanEpisodes = 0;
-        let page = 1;
-        let hasMore = true;
-        
-        while (hasMore && page <= 100) {
-          try {
-            const res = await fetch(`https://api.jikan.moe/v4/anime/${id}/episodes?page=${page}&_=${cacheBuster}`);
-            const data = await res.json();
+      // 3. Fetch Jikan Relations (for Seasons & sequels/prequels)
+      fetch(`https://api.jikan.moe/v4/anime/${id}/relations`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.data) {
+            const relevantRelations: any[] = [];
+            const allowedTypes = ['Prequel', 'Sequel', 'Alternative version', 'Alternative setting', 'Parent story', 'Full story', 'Spin-off', 'Side story'];
             
-            if (data && data.data && Array.isArray(data.data)) {
-              jikanEpisodes += data.data.length;
-              
-              if (data.pagination && data.pagination.has_next_page) {
-                page++;
-              } else {
-                hasMore = false;
+            data.data.forEach((rel: any) => {
+              if (allowedTypes.includes(rel.relation)) {
+                rel.entry.forEach((entry: any) => {
+                  if (entry.type === 'anime') {
+                    relevantRelations.push({
+                      relation: rel.relation,
+                      mal_id: entry.mal_id,
+                      name: entry.name
+                    });
+                  }
+                });
               }
-            } else {
-              hasMore = false;
-            }
-            
-            if (hasMore) {
-              await new Promise(resolve => setTimeout(resolve, 400));
-            }
-          } catch (error) {
-            console.error('Error fetching episodes:', error);
-            hasMore = false;
+            });
+            setRelations(relevantRelations);
           }
-        }
-        
-        // Use the higher count between AnimePlay and Jikan
-        if (serverEpisodes && jikanEpisodes) {
-          setTotalEpisodes(Math.max(serverEpisodes, jikanEpisodes));
-        } else if (serverEpisodes) {
-          setTotalEpisodes(serverEpisodes);
-        } else if (jikanEpisodes > 0) {
-          setTotalEpisodes(jikanEpisodes);
-        } else {
-          // Final fallback: use episodes field from anime data
-          fetch(`https://api.jikan.moe/v4/anime/${id}?_=${cacheBuster}`)
-            .then(res => res.json())
-            .then(data => {
-              if (data && data.data && data.data.episodes) {
-                setTotalEpisodes(data.data.episodes);
-              }
-            })
-            .catch(console.error);
-        }
-      };
+        })
+        .catch(console.error);
 
-      fetchAllEpisodes();
-
+      // 4. Sync Watchlist & Watch History from Supabase
       if (user) {
         supabase.from('watchlists')
           .select('id')
@@ -247,6 +221,58 @@ export function Watch() {
             {/* Controls */}
             <div style={{ flex: '1 1 300px' }}>
               <h1 style={{ fontSize: '2rem', fontWeight: 900, marginBottom: '1rem', lineHeight: 1.2 }}>{animeName}</h1>
+
+              {/* Seasons & Related Anime */}
+              {relations.length > 0 && (
+                <div style={{ marginTop: '1.5rem', marginBottom: '2rem' }}>
+                  <h3 style={{ fontSize: '0.85rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+                    Seasons & Related Shows
+                  </h3>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {relations.map((rel, idx) => (
+                      <Link
+                        key={`rel-${rel.mal_id}-${idx}`}
+                        to={`/watch/${rel.mal_id}`}
+                        className="hover-scale"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          padding: '0.5rem 1rem',
+                          borderRadius: '0.5rem',
+                          backgroundColor: 'var(--bg-color-secondary)',
+                          border: '1px solid var(--border-color)',
+                          color: 'white',
+                          textDecoration: 'none',
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          transition: 'all 0.2s ease',
+                        }}
+                      >
+                        <span style={{ 
+                          fontSize: '0.65rem', 
+                          fontWeight: 900, 
+                          backgroundColor: rel.relation === 'Sequel' ? '#22c55e' : rel.relation === 'Prequel' ? '#ef4444' : 'var(--accent-primary)', 
+                          color: 'black', 
+                          padding: '0.1rem 0.35rem', 
+                          borderRadius: '0.25rem',
+                          textTransform: 'uppercase'
+                        }}>
+                          {rel.relation}
+                        </span>
+                        <span style={{ 
+                          whiteSpace: 'nowrap', 
+                          overflow: 'hidden', 
+                          textOverflow: 'ellipsis', 
+                          maxWidth: '180px' 
+                        }}>
+                          {rel.name}
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
               
               {/* Episode Navigation */}
               <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>

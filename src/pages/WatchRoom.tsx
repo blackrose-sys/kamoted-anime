@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { Users, Play, Pause, Copy, Check, ArrowLeft, Crown, Loader2, Wifi } from 'lucide-react';
+import { Users, Play, Pause, Copy, Check, ArrowLeft, Crown, Loader2, Wifi, Server, ChevronDown } from 'lucide-react';
+import { animeServers, getServerUrl, fetchAniListMetadata } from '../lib/animeServers';
 
 interface RoomMember {
   user_id: string;
@@ -42,17 +43,25 @@ export function WatchRoom() {
   const [animeTitle, setAnimeTitle] = useState('');
   const [chatInput, setChatInput] = useState('');
   const [chatMessages, setChatMessages] = useState<{ user: string; msg: string; time: string }[]>([]);
+  const [selectedServer, setSelectedServer] = useState<any>(animeServers[0]);
+  const [showServerDropdown, setShowServerDropdown] = useState(false);
+  const [type, setType] = useState<'sub' | 'dub'>('sub');
+  const [anilistId, setAnilistId] = useState<string>('');
+  
+  const channelRef = useRef<any>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
   const isHost = room?.host_id === user?.id;
 
   // Load room
   useEffect(() => {
-    if (!roomId) { setError('Invalid room'); setLoading(false); return; }
+    const upperRoomId = roomId?.toUpperCase() || '';
+    if (!upperRoomId) { setError('Invalid room'); setLoading(false); return; }
 
     const load = async () => {
       const { data, error: err } = await supabase
         .from('watch_rooms')
         .select('*')
-        .eq('room_code', roomId.toUpperCase())
+        .eq('room_code', upperRoomId)
         .maybeSingle();
 
       if (err || !data) { setError('Room not found or has ended.'); setLoading(false); return; }
@@ -65,20 +74,33 @@ export function WatchRoom() {
         setAnimeTitle(json.data?.title_english || json.data?.title || `Anime #${data.anime_id}`);
       } catch { setAnimeTitle(`Anime #${data.anime_id}`); }
 
+      // Fetch AniList metadata for servers that require AniList ID
+      try {
+        const metadata = await fetchAniListMetadata(data.anime_id.toString());
+        if (metadata.anilistId) setAnilistId(metadata.anilistId);
+      } catch (e) {
+        console.error('Failed to fetch AniList metadata for watch room:', e);
+      }
+
       setLoading(false);
     };
     load();
 
-    // Realtime room updates
+    // Realtime room updates & Chat broadcasts
     const channel = supabase
-      .channel(`room-${roomId}`)
+      .channel(`room-${upperRoomId}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'watch_rooms' }, (p) => {
         setRoom(p.new as WatchRoom);
       })
-      .subscribe();
+      .on('broadcast', { event: 'chat' }, (payload) => {
+        setChatMessages(prev => [...prev, payload.payload]);
+      });
+    
+    channel.subscribe();
+    channelRef.current = channel;
 
     // Presence for members
-    const presenceChannel = supabase.channel(`room-presence-${roomId}`);
+    const presenceChannel = supabase.channel(`room-presence-${upperRoomId}`);
     presenceChannel
       .on('presence', { event: 'sync' }, () => {
         const state = presenceChannel.presenceState<RoomMember>();
@@ -102,6 +124,11 @@ export function WatchRoom() {
     };
   }, [roomId, user]);
 
+  // Auto-scroll chat to bottom
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
+
   const handlePlayPause = async () => {
     if (!room || !isHost) return;
     await supabase.from('watch_rooms').update({
@@ -124,9 +151,25 @@ export function WatchRoom() {
 
   const handleSendChat = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!chatInput.trim() || !user) return;
-    setChatMessages(prev => [...prev, { user: user.username, msg: chatInput.trim(), time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
+    const upperRoomId = roomId?.toUpperCase() || '';
+    if (!chatInput.trim() || !user || !upperRoomId) return;
+    
+    const msgPayload = { 
+      user: user.username, 
+      msg: chatInput.trim(), 
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+    };
+
+    setChatMessages(prev => [...prev, msgPayload]);
     setChatInput('');
+
+    if (channelRef.current) {
+      channelRef.current.send({
+        type: 'broadcast',
+        event: 'chat',
+        payload: msgPayload
+      });
+    }
   };
 
   if (loading) return (
@@ -170,10 +213,12 @@ export function WatchRoom() {
           {/* Player embed */}
           <div style={{ flex: 1, backgroundColor: '#000', position: 'relative' }}>
             <iframe
-              src={`https://www.2embed.cc/embed/${room?.anime_id}?ep=${room?.episode}`}
+              src={getServerUrl(selectedServer, room?.anime_id.toString() || '', room?.episode || 1, type, anilistId || room?.anime_id.toString() || '')}
               style={{ width: '100%', height: '100%', border: 'none' }}
               allowFullScreen
+              allow="autoplay; encrypted-media; picture-in-picture"
               title="Watch Together Player"
+              key={`${selectedServer.id}-${room?.episode}-${type}`}
             />
             {!room?.is_playing && (
               <div style={{
@@ -198,7 +243,7 @@ export function WatchRoom() {
           </div>
 
           {/* Controls */}
-          <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '1rem', flexShrink: 0 }}>
+          <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '1rem', flexShrink: 0, flexWrap: 'wrap' }}>
             {isHost ? (
               <>
                 <button onClick={handlePlayPause} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.25rem', borderRadius: '9999px', background: 'linear-gradient(135deg, var(--accent-primary), #d97706)', border: 'none', color: 'black', fontWeight: 900, fontSize: '0.82rem', cursor: 'pointer' }}>
@@ -206,16 +251,125 @@ export function WatchRoom() {
                 </button>
                 <button onClick={() => handleEpisodeChange(-1)} style={{ padding: '0.6rem 1rem', borderRadius: '9999px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', cursor: 'pointer', fontWeight: 800, fontSize: '0.8rem' }}>← Prev Ep</button>
                 <button onClick={() => handleEpisodeChange(1)} style={{ padding: '0.6rem 1rem', borderRadius: '9999px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', cursor: 'pointer', fontWeight: 800, fontSize: '0.8rem' }}>Next Ep →</button>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>
-                  <Crown size={12} style={{ display: 'inline', color: 'var(--accent-primary)' }} /> You are the host
-                </span>
               </>
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
-                <Crown size={14} color="var(--accent-primary)" />
-                Controls are managed by the host
+            ) : null}
+
+            {/* Common Stream Customizations (Available to Host & Guest) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              {/* SUB/DUB Toggle */}
+              <div style={{ display: 'flex', gap: '2px', backgroundColor: 'rgba(255,255,255,0.04)', padding: '2px', borderRadius: '9999px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <button 
+                  onClick={() => setType('sub')} 
+                  style={{ 
+                    padding: '0.45rem 0.9rem', 
+                    borderRadius: '9999px', 
+                    border: 'none', 
+                    background: type === 'sub' ? 'var(--accent-primary)' : 'transparent', 
+                    color: type === 'sub' ? 'black' : 'rgba(255,255,255,0.7)', 
+                    fontWeight: 900, 
+                    fontSize: '0.72rem', 
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  SUB
+                </button>
+                <button 
+                  onClick={() => setType('dub')} 
+                  style={{ 
+                    padding: '0.45rem 0.9rem', 
+                    borderRadius: '9999px', 
+                    border: 'none', 
+                    background: type === 'dub' ? 'var(--accent-primary)' : 'transparent', 
+                    color: type === 'dub' ? 'black' : 'rgba(255,255,255,0.7)', 
+                    fontWeight: 900, 
+                    fontSize: '0.72rem', 
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  DUB
+                </button>
               </div>
-            )}
+
+              {/* Server Selector */}
+              <div style={{ position: 'relative' }}>
+                <button 
+                  onClick={() => setShowServerDropdown(!showServerDropdown)} 
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '0.4rem', 
+                    padding: '0.55rem 1rem', 
+                    borderRadius: '9999px', 
+                    background: 'rgba(255,255,255,0.06)', 
+                    border: '1px solid rgba(255,255,255,0.1)', 
+                    color: 'white', 
+                    cursor: 'pointer', 
+                    fontWeight: 800, 
+                    fontSize: '0.75rem' 
+                  }}
+                >
+                  <Server size={13} />
+                  <span>{selectedServer.name}</span>
+                  <ChevronDown size={13} />
+                </button>
+                {showServerDropdown && (
+                  <div style={{ 
+                    position: 'absolute', 
+                    bottom: '100%', 
+                    left: 0, 
+                    marginBottom: '0.5rem', 
+                    backgroundColor: '#0a0a0f', 
+                    border: '1px solid rgba(255,255,255,0.12)', 
+                    borderRadius: '0.75rem', 
+                    padding: '0.4rem', 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: '0.2rem', 
+                    zIndex: 100, 
+                    minWidth: '180px',
+                    boxShadow: '0 -10px 25px rgba(0,0,0,0.5)',
+                    backdropFilter: 'blur(10px)'
+                  }}>
+                    {animeServers.map((server) => (
+                      <button
+                        key={server.id}
+                        onClick={() => {
+                          setSelectedServer(server);
+                          setShowServerDropdown(false);
+                        }}
+                        style={{ 
+                          padding: '0.55rem 0.75rem', 
+                          textAlign: 'left', 
+                          backgroundColor: selectedServer.id === server.id ? 'var(--accent-primary)' : 'transparent', 
+                          color: selectedServer.id === server.id ? 'black' : 'white', 
+                          borderRadius: '0.5rem', 
+                          border: 'none', 
+                          cursor: 'pointer', 
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.4rem',
+                          transition: 'all 0.15s'
+                        }}
+                        onMouseOver={e => e.currentTarget.style.backgroundColor = selectedServer.id === server.id ? 'var(--accent-primary)' : 'rgba(255,255,255,0.06)'}
+                        onMouseOut={e => e.currentTarget.style.backgroundColor = selectedServer.id === server.id ? 'var(--accent-primary)' : 'transparent'}
+                      >
+                        <Server size={12} />
+                        {server.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <Crown size={12} style={{ color: isHost ? 'var(--accent-primary)' : 'var(--text-secondary)' }} />
+              {isHost ? 'You are the host' : 'Controls managed by host'}
+            </span>
           </div>
         </div>
 
@@ -280,6 +434,7 @@ export function WatchRoom() {
                   <div style={{ color: 'rgba(255,255,255,0.8)', marginTop: '0.1rem', lineHeight: 1.4 }}>{cm.msg}</div>
                 </div>
               ))}
+              <div ref={chatEndRef} />
             </div>
             <form onSubmit={handleSendChat} style={{ padding: '0.75rem 1rem', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', gap: '0.5rem' }}>
               <input

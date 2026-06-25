@@ -92,6 +92,9 @@ export function WatchRoom() {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'watch_rooms' }, (p) => {
         setRoom(p.new as WatchRoom);
       })
+      .on('broadcast', { event: 'room_update' }, (payload) => {
+        setRoom(prev => prev ? { ...prev, ...payload.payload } : null);
+      })
       .on('broadcast', { event: 'chat' }, (payload) => {
         setChatMessages(prev => [...prev, payload.payload]);
       });
@@ -131,16 +134,39 @@ export function WatchRoom() {
 
   const handlePlayPause = async () => {
     if (!room || !isHost) return;
+    const nextPlaying = !room.is_playing;
+    
     await supabase.from('watch_rooms').update({
-      is_playing: !room.is_playing,
+      is_playing: nextPlaying,
       updated_at: new Date().toISOString()
     }).eq('id', room.id);
+
+    if (channelRef.current) {
+      channelRef.current.send({
+        type: 'broadcast',
+        event: 'room_update',
+        payload: { is_playing: nextPlaying }
+      });
+    }
+
+    setRoom(prev => prev ? { ...prev, is_playing: nextPlaying } : null);
   };
 
   const handleEpisodeChange = async (delta: number) => {
     if (!room || !isHost) return;
     const newEp = Math.max(1, room.episode + delta);
+
     await supabase.from('watch_rooms').update({ episode: newEp, current_time: 0, is_playing: false, updated_at: new Date().toISOString() }).eq('id', room.id);
+
+    if (channelRef.current) {
+      channelRef.current.send({
+        type: 'broadcast',
+        event: 'room_update',
+        payload: { episode: newEp, is_playing: false }
+      });
+    }
+
+    setRoom(prev => prev ? { ...prev, episode: newEp, is_playing: false } : null);
   };
 
   const handleCopyCode = () => {
@@ -218,7 +244,7 @@ export function WatchRoom() {
               allowFullScreen
               allow="autoplay; encrypted-media; picture-in-picture"
               title="Watch Together Player"
-              key={`${selectedServer.id}-${room?.episode}-${type}`}
+              key={`${selectedServer.id}-${room?.episode}-${type}-${anilistId}`}
             />
             {!room?.is_playing && (
               <div style={{

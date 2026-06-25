@@ -332,7 +332,7 @@ export function Watch() {
                 allowFullScreen 
                 allow="autoplay; encrypted-media; picture-in-picture"
                 style={{ backgroundColor: 'black' }}
-                key={`${selectedServer.id}-${selectedEpisode}-${type}`}
+                key={`${selectedServer.id}-${selectedEpisode}-${type}-${anilistId}`}
               />
             </div>
             

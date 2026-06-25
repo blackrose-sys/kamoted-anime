@@ -163,8 +163,12 @@ CREATE TABLE IF NOT EXISTS public.chat_messages (
   username TEXT NOT NULL,
   avatar_url TEXT,
   message TEXT NOT NULL CHECK (char_length(message) > 0 AND char_length(message) <= 500),
+  reactions JSONB DEFAULT '{}'::jsonb NOT NULL,
   created_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
+
+-- Add reactions column to existing tables (idempotent)
+ALTER TABLE public.chat_messages ADD COLUMN IF NOT EXISTS reactions JSONB DEFAULT '{}'::jsonb NOT NULL;
 
 -- Enable RLS
 ALTER TABLE public.chat_messages ENABLE ROW LEVEL SECURITY;
@@ -176,5 +180,12 @@ CREATE POLICY "Chat messages are viewable by everyone" ON public.chat_messages F
 DROP POLICY IF EXISTS "Users can post chat messages" ON public.chat_messages;
 CREATE POLICY "Users can post chat messages" ON public.chat_messages FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete their own chat messages" ON public.chat_messages;
+CREATE POLICY "Users can delete their own chat messages" ON public.chat_messages FOR DELETE USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can update reactions on any message" ON public.chat_messages;
+CREATE POLICY "Users can update reactions on any message" ON public.chat_messages FOR UPDATE USING (true) WITH CHECK (true);
+
 -- Index for fast chat loads
 CREATE INDEX IF NOT EXISTS idx_chat_messages_created ON public.chat_messages(created_at DESC);
+

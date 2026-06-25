@@ -62,10 +62,13 @@ export function Home() {
     setLoading(true);
     setError(null);
 
+    // 1. Latest this season (check cache first)
+    let latestData: AnimeData[] = [];
     try {
-      // 1. Latest this season (check cache first)
-      let latestData = getCached<AnimeData[]>('home_latest');
-      if (!latestData) {
+      const cached = getCached<AnimeData[]>('home_latest');
+      if (cached) {
+        latestData = cached;
+      } else {
         const res = await fetchWithRetry('https://api.jikan.moe/v4/seasons/now?sfw=true&limit=24');
         const rawList = res.data || [];
         const seenIds = new Set<number>();
@@ -83,12 +86,16 @@ export function Home() {
         latestData = uniqueList;
         setCache('home_latest', latestData);
       }
-      setLatestAnime(latestData || []);
+      setLatestAnime(latestData);
+    } catch (err) {
+      console.error('Failed to fetch latest season data:', err);
+    }
 
-      // Small delay to avoid rate limit
-      await new Promise(r => setTimeout(r, 600));
+    // Small delay to avoid rate limit
+    await new Promise(r => setTimeout(r, 600));
 
-      // 2. Recently updated (check cache first)
+    // 2. Recently updated (check cache first)
+    try {
       let recentData = getCached<AnimeData[]>('home_recent');
       if (!recentData) {
         const query = `
@@ -174,11 +181,17 @@ export function Home() {
         setCache('home_recent', recentData);
       }
       setRecentlyUpdated(recentData || []);
+    } catch (err) {
+      console.error('Failed to fetch recently updated data:', err);
+      // Fallback: If AniList fails (e.g. adblock blocked), fill recently updated with seasonal data
+      setRecentlyUpdated(latestData.slice(0, 24));
+    }
 
-      // Small delay
-      await new Promise(r => setTimeout(r, 600));
+    // Small delay
+    await new Promise(r => setTimeout(r, 600));
 
-      // 3. Top anime (check cache first)
+    // 3. Top anime (check cache first)
+    try {
       let topData = getCached<AnimeData[]>('home_top');
       if (!topData) {
         const res = await fetchWithRetry('https://api.jikan.moe/v4/top/anime?sfw=true&limit=10');
@@ -196,12 +209,15 @@ export function Home() {
         setCache('home_top', topData);
       }
       setTopAnime(topData || []);
-    } catch (err: any) {
-      console.error('Failed to fetch anime data:', err);
-      setError('Failed to load anime data. Please refresh the page.');
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      console.error('Failed to fetch top anime data:', err);
     }
+
+    // Only show error if both main sections completely failed to load
+    if (latestData.length === 0) {
+      setError('Failed to load anime data. Please refresh the page.');
+    }
+    setLoading(false);
   }, []);
 
   // Fetch anime data ONCE on mount (no dependency on user)

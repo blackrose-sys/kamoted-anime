@@ -48,6 +48,32 @@ export function Register() {
     setLoading(true);
 
     try {
+      // Check if email already exists in profiles
+      const { data: existingEmail } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', email.trim().toLowerCase())
+        .maybeSingle();
+
+      if (existingEmail) {
+        setError('This email is already registered. Try logging in instead.');
+        setLoading(false);
+        return;
+      }
+
+      // Check if username already exists in profiles
+      const { data: existingUsername } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', username.trim())
+        .maybeSingle();
+
+      if (existingUsername) {
+        setError('This username is already taken. Please choose another one.');
+        setLoading(false);
+        return;
+      }
+
       const { data, error: signUpError } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
         password,

@@ -557,36 +557,39 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
                 }}
               >
                 {/* Avatar */}
-                <div style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '50%',
-                  background: getAvatarColor(comment.username),
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 900,
-                  fontSize: '0.75rem',
-                  color: '#fff',
-                  flexShrink: 0,
-                  border: '2px solid rgba(255,255,255,0.08)',
-                  overflow: 'hidden',
-                }}>
-                  {comment.avatar_url ? (
-                    <img src={comment.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    getInitials(comment.username)
-                  )}
-                </div>
+                <Link to={`/user/${comment.username}`} style={{ textDecoration: 'none' }} className="hover-scale">
+                  <div style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '50%',
+                    background: getAvatarColor(comment.username),
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 900,
+                    fontSize: '0.75rem',
+                    color: '#fff',
+                    flexShrink: 0,
+                    border: '2px solid rgba(255,255,255,0.08)',
+                    overflow: 'hidden',
+                  }}>
+                    {comment.avatar_url ? (
+                      <img src={comment.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      getInitials(comment.username)
+                    )}
+                  </div>
+                </Link>
 
                 {/* Content */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem', flexWrap: 'wrap' }}>
-                    <span style={{
+                    <Link to={`/user/${comment.username}`} style={{
                       fontWeight: 800,
                       fontSize: '0.85rem',
                       color: user && comment.user_id === user.id ? 'var(--accent-primary)' : 'white',
-                    }}>
+                      textDecoration: 'none',
+                    }} className="hover-underline">
                       {comment.username}
                       {user && comment.user_id === user.id && (
                         <span style={{
@@ -604,7 +607,7 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
                           You
                         </span>
                       )}
-                    </span>
+                    </Link>
                     <span style={{
                       display: 'inline-flex',
                       alignItems: 'center',

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Navigate, Link } from 'react-router-dom';
-import { Loader2, Bookmark, Clock, Trash2, Play, Camera, X, Check, Save, User, Mail, ZoomIn, ZoomOut } from 'lucide-react';
+import { Loader2, Bookmark, Clock, Trash2, Play, Camera, X, Check, Save, User, Mail, ZoomIn, ZoomOut, Globe, Lock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 export function Profile() {
@@ -14,6 +14,7 @@ export function Profile() {
 
   // Username form states
   const [usernameInput, setUsernameInput] = useState('');
+  const [privacy, setPrivacy] = useState<'public' | 'private'>('public');
   const [updatingUsername, setUpdatingUsername] = useState(false);
   const [showSuccessMsg, setShowSuccessMsg] = useState(false);
 
@@ -32,6 +33,7 @@ export function Profile() {
   useEffect(() => {
     if (user) {
       setUsernameInput(user.username || '');
+      setPrivacy(user.watchlist_privacy || 'public');
       
       if (activeTab === 'watchlist') {
         supabase.from('watchlists').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
@@ -164,7 +166,7 @@ export function Profile() {
     }
   };
 
-  // Handle Username Edit
+  // Handle Profile Settings Edit
   const handleSaveUsername = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!usernameInput.trim() || usernameInput.trim().length < 3) {
@@ -173,12 +175,16 @@ export function Profile() {
     }
     setUpdatingUsername(true);
     try {
-      await updateUser({ ...user, username: usernameInput.trim() });
+      await updateUser({ 
+        ...user, 
+        username: usernameInput.trim(),
+        watchlist_privacy: privacy
+      });
       setShowSuccessMsg(true);
       setTimeout(() => setShowSuccessMsg(false), 3000);
     } catch (error) {
-      console.error('Error saving username:', error);
-      alert('Failed to update username.');
+      console.error('Error saving settings:', error);
+      alert('Failed to update profile settings.');
     } finally {
       setUpdatingUsername(false);
     }
@@ -398,17 +404,73 @@ export function Profile() {
                 </div>
               </div>
 
+              {/* Watchlist Privacy Selector */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>
+                  Watchlist Privacy
+                </label>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => setPrivacy('public')}
+                    style={{
+                      flex: 1,
+                      padding: '0.85rem 1rem',
+                      borderRadius: '0.75rem',
+                      backgroundColor: privacy === 'public' ? 'rgba(245, 158, 11, 0.1)' : 'var(--bg-color-secondary)',
+                      border: privacy === 'public' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                      color: privacy === 'public' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    <Globe size={16} /> Public
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPrivacy('private')}
+                    style={{
+                      flex: 1,
+                      padding: '0.85rem 1rem',
+                      borderRadius: '0.75rem',
+                      backgroundColor: privacy === 'private' ? 'rgba(245, 158, 11, 0.1)' : 'var(--bg-color-secondary)',
+                      border: privacy === 'private' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                      color: privacy === 'private' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    <Lock size={16} /> Private
+                  </button>
+                </div>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', margin: 0 }}>
+                  {privacy === 'public' 
+                    ? 'Everyone can stalk your profile and see your anime playlist.' 
+                    : 'Only you can view your watchlist. Other users will see it locked.'}
+                </p>
+              </div>
+
               {/* Submit Button */}
               <button 
                 type="submit"
-                disabled={updatingUsername || usernameInput.trim() === user.username}
+                disabled={updatingUsername || (usernameInput.trim() === user.username && privacy === user.watchlist_privacy)}
                 style={{ 
                   padding: '0.85rem 2rem', 
                   borderRadius: '0.75rem', 
                   background: 'linear-gradient(135deg, var(--accent-primary), #8b5cf6)', 
                   color: 'black', 
                   border: 'none', 
-                  cursor: updatingUsername || usernameInput.trim() === user.username ? 'not-allowed' : 'pointer',
+                  cursor: updatingUsername || (usernameInput.trim() === user.username && privacy === user.watchlist_privacy) ? 'not-allowed' : 'pointer',
                   display: 'flex', 
                   justifyContent: 'center', 
                   alignItems: 'center',
@@ -417,7 +479,7 @@ export function Profile() {
                   fontSize: '0.95rem',
                   boxShadow: '0 4px 15px rgba(245, 158, 11, 0.25)',
                   transition: 'all 0.3s ease',
-                  opacity: updatingUsername || usernameInput.trim() === user.username ? 0.4 : 1,
+                  opacity: updatingUsername || (usernameInput.trim() === user.username && privacy === user.watchlist_privacy) ? 0.4 : 1,
                   marginTop: '0.5rem'
                 }}
               >

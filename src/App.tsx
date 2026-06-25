@@ -8,6 +8,7 @@ import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { Verify } from './pages/Verify';
 import { Profile } from './pages/Profile';
+import { UserProfile } from './pages/UserProfile';
 import { AuthProvider } from './context/AuthContext';
 
 function App() {
@@ -24,6 +25,7 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/verify" element={<Verify />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/user/:username" element={<UserProfile />} />
           </Routes>
           <Footer />
         </div>

@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Search, ChevronDown, BookmarkPlus, BookmarkCheck, Server, SkipForward, ChevronRight, ChevronLeft, ToggleLeft, ToggleRight } from 'lucide-react';
+import { ArrowLeft, Search, ChevronDown, BookmarkPlus, BookmarkCheck, Server, SkipForward, ChevronRight, ChevronLeft, ToggleLeft, ToggleRight, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { animeServers, getServerUrl, fetchAniListMetadata, type AnimeServer } from '../lib/animeServers';
@@ -20,6 +20,10 @@ export function Watch() {
   
   const [inWatchlist, setInWatchlist] = useState(false);
   const [watchlistLoading, setWatchlistLoading] = useState(false);
+  const [watchlistStatus, setWatchlistStatus] = useState<string>('watching');
+  const [showWatchlistDropdown, setShowWatchlistDropdown] = useState(false);
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [recommendationsLoading, setRecommendationsLoading] = useState(true);
   
   const [currentChunk, setCurrentChunk] = useState<number>(0);
   const [searchQuery, setSearchQuery] = useState('');
@@ -97,12 +101,17 @@ export function Watch() {
       // 4. Sync Watchlist & Watch History from Supabase
       if (user) {
         supabase.from('watchlists')
-          .select('id')
+          .select('id, status')
           .eq('user_id', user.id)
           .eq('anime_id', parseInt(id))
           .single()
           .then(({ data }) => {
-            if (data) setInWatchlist(true);
+            if (data) {
+              setInWatchlist(true);
+              setWatchlistStatus(data.status || 'watching');
+            } else {
+              setInWatchlist(false);
+            }
           });
           
         supabase.from('watch_history')
@@ -117,26 +126,64 @@ export function Watch() {
             }
           });
       }
+
+      // 5. Fetch Jikan Recommendations
+      setRecommendationsLoading(true);
+      fetch(`https://api.jikan.moe/v4/anime/${id}/recommendations`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.data) {
+            setRecommendations(data.data.slice(0, 10));
+          }
+        })
+        .catch(console.error)
+        .finally(() => setRecommendationsLoading(false));
     }
   }, [id, user]);
 
-  const toggleWatchlist = async () => {
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'watching': return 'Watching';
+      case 'plan_to_watch': return 'Plan to Watch';
+      case 'completed': return 'Completed';
+      case 'on_hold': return 'On Hold';
+      case 'dropped': return 'Dropped';
+      default: return 'Watching';
+    }
+  };
+
+  const handleWatchlistStatusChange = async (status: string) => {
     if (!user || !id) return alert('Please login to save to your watchlist!');
     setWatchlistLoading(true);
-    
-    if (inWatchlist) {
-      await supabase.from('watchlists').delete().eq('user_id', user.id).eq('anime_id', parseInt(id));
-      setInWatchlist(false);
-    } else {
-      await supabase.from('watchlists').insert({
-        user_id: user.id,
-        anime_id: parseInt(id),
-        title: animeName,
-        image_url: animeImage
-      });
-      setInWatchlist(true);
+    try {
+      if (status === 'remove') {
+        const { error } = await supabase
+          .from('watchlists')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('anime_id', parseInt(id));
+        if (error) throw error;
+        setInWatchlist(false);
+      } else {
+        const { error } = await supabase
+          .from('watchlists')
+          .upsert({
+            user_id: user.id,
+            anime_id: parseInt(id),
+            title: animeName,
+            image_url: animeImage,
+            status: status
+          }, { onConflict: 'user_id, anime_id' });
+        if (error) throw error;
+        setInWatchlist(true);
+        setWatchlistStatus(status);
+      }
+    } catch (err) {
+      console.error('Failed to update watchlist status:', err);
+    } finally {
+      setWatchlistLoading(false);
+      setShowWatchlistDropdown(false);
     }
-    setWatchlistLoading(false);
   };
 
   const handleEpisodeClick = async (epNum: number) => {
@@ -441,23 +488,106 @@ export function Watch() {
                   )}
                 </div>
 
-                <button 
-                  onClick={toggleWatchlist}
-                  disabled={watchlistLoading}
-                  className="btn-primary"
-                  style={{ 
-                    backgroundColor: inWatchlist ? 'rgba(168, 85, 247, 0.2)' : 'var(--bg-color-secondary)', 
-                    color: inWatchlist ? 'var(--accent-primary)' : 'white',
-                    border: `1px solid ${inWatchlist ? 'var(--accent-primary)' : 'var(--border-color)'}`,
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '0.5rem',
-                    marginLeft: 'auto'
-                  }}
-                >
-                  {inWatchlist ? <BookmarkCheck size={18} /> : <BookmarkPlus size={18} />}
-                  <span className="hidden sm:inline">{inWatchlist ? 'In Watchlist' : 'Add to Watchlist'}</span>
-                </button>
+                <div style={{ position: 'relative', marginLeft: 'auto' }}>
+                  <button 
+                    onClick={() => setShowWatchlistDropdown(!showWatchlistDropdown)}
+                    disabled={watchlistLoading}
+                    className="btn-primary"
+                    style={{ 
+                      backgroundColor: inWatchlist ? 'rgba(168, 85, 247, 0.2)' : 'var(--bg-color-secondary)', 
+                      color: inWatchlist ? 'var(--accent-primary)' : 'white',
+                      border: `1px solid ${inWatchlist ? 'var(--accent-primary)' : 'var(--border-color)'}`,
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '0.5rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {inWatchlist ? <BookmarkCheck size={18} /> : <BookmarkPlus size={18} />}
+                    <span>{inWatchlist ? getStatusLabel(watchlistStatus) : 'Add to Watchlist'}</span>
+                    <ChevronDown size={14} />
+                  </button>
+                  
+                  {showWatchlistDropdown && (
+                    <div style={{ 
+                      position: 'absolute', 
+                      bottom: '100%', 
+                      right: 0, 
+                      marginBottom: '0.5rem', 
+                      backgroundColor: 'var(--bg-color-secondary)', 
+                      border: '1px solid var(--border-color)', 
+                      borderRadius: '0.5rem', 
+                      padding: '0.5rem', 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      gap: '0.25rem', 
+                      zIndex: 50, 
+                      minWidth: '180px',
+                      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)',
+                      backdropFilter: 'blur(10px)'
+                    }}>
+                      {[
+                        { value: 'watching', label: 'Watching' },
+                        { value: 'plan_to_watch', label: 'Plan to Watch' },
+                        { value: 'completed', label: 'Completed' },
+                        { value: 'on_hold', label: 'On Hold' },
+                        { value: 'dropped', label: 'Dropped' }
+                      ].map((opt) => (
+                        <button
+                          key={opt.value}
+                          onClick={() => handleWatchlistStatusChange(opt.value)}
+                          style={{
+                            padding: '0.6rem 0.85rem',
+                            textAlign: 'left',
+                            backgroundColor: inWatchlist && watchlistStatus === opt.value ? 'rgba(168, 85, 247, 0.2)' : 'transparent',
+                            color: inWatchlist && watchlistStatus === opt.value ? 'var(--accent-primary)' : 'white',
+                            border: 'none',
+                            borderRadius: '0.25rem',
+                            cursor: 'pointer',
+                            fontSize: '0.85rem',
+                            fontWeight: 700,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseOver={e => e.currentTarget.style.backgroundColor = 'var(--bg-color-tertiary)'}
+                          onMouseOut={e => e.currentTarget.style.backgroundColor = inWatchlist && watchlistStatus === opt.value ? 'rgba(168, 85, 247, 0.2)' : 'transparent'}
+                        >
+                          {opt.label}
+                          {inWatchlist && watchlistStatus === opt.value && <Check size={14} />}
+                        </button>
+                      ))}
+                      {inWatchlist && (
+                        <>
+                          <div style={{ height: '1px', backgroundColor: 'var(--border-color)', margin: '0.25rem 0' }} />
+                          <button
+                            onClick={() => handleWatchlistStatusChange('remove')}
+                            style={{
+                              padding: '0.6rem 0.85rem',
+                              textAlign: 'left',
+                              backgroundColor: 'transparent',
+                              color: '#ef4444',
+                              border: 'none',
+                              borderRadius: '0.25rem',
+                              cursor: 'pointer',
+                              fontSize: '0.85rem',
+                              fontWeight: 700,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.5rem',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseOver={e => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'}
+                            onMouseOut={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                          >
+                            Remove from Playlist
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div style={{ backgroundColor: 'var(--bg-color-secondary)', borderRadius: '1rem', padding: '1.5rem', border: '1px solid var(--border-color)' }}>
@@ -541,6 +671,71 @@ export function Watch() {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Smart Recommendations */}
+              <div style={{ marginTop: '2.5rem', marginBottom: '2.5rem' }}>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ color: 'var(--accent-primary)' }}>✨</span> You Might Also Like
+                </h3>
+                {recommendationsLoading ? (
+                  <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '1rem' }}>
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <div key={i} className="animate-pulse" style={{ width: '150px', height: '225px', backgroundColor: 'var(--bg-color-secondary)', borderRadius: '0.75rem', flexShrink: 0 }} />
+                    ))}
+                  </div>
+                ) : recommendations.length === 0 ? (
+                  <div style={{ padding: '2rem', backgroundColor: 'var(--bg-color-secondary)', borderRadius: '0.75rem', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'center', fontSize: '0.9rem' }}>
+                    No recommendations available for this anime.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '1rem', scrollbarWidth: 'thin' }}>
+                    {recommendations.map((rec) => (
+                      <Link
+                        key={rec.entry.mal_id}
+                        to={`/watch/${rec.entry.mal_id}`}
+                        className="hover-scale"
+                        style={{
+                          width: '150px',
+                          flexShrink: 0,
+                          textDecoration: 'none',
+                          color: 'white',
+                          backgroundColor: 'var(--bg-color-secondary)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '0.75rem',
+                          overflow: 'hidden',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <div style={{ width: '100%', aspectRatio: '2/3', position: 'relative' }}>
+                          <img
+                            src={rec.entry.images?.webp?.large_image_url || rec.entry.images?.webp?.image_url}
+                            alt={rec.entry.title}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            loading="lazy"
+                          />
+                        </div>
+                        <div style={{ padding: '0.75rem', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                          <h4 style={{
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            margin: 0,
+                            lineHeight: 1.3,
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}>
+                            {rec.entry.title}
+                          </h4>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Comment Section */}

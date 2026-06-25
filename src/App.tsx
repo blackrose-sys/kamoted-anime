@@ -9,6 +9,7 @@ import { Register } from './pages/Register';
 import { Verify } from './pages/Verify';
 import { Profile } from './pages/Profile';
 import { UserProfile } from './pages/UserProfile';
+import { Calendar } from './pages/Calendar';
 import { AuthProvider } from './context/AuthContext';
 
 function App() {
@@ -26,6 +27,7 @@ function App() {
             <Route path="/verify" element={<Verify />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/user/:username" element={<UserProfile />} />
+            <Route path="/calendar" element={<Calendar />} />
           </Routes>
           <Footer />
         </div>

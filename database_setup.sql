@@ -153,3 +153,28 @@ CREATE POLICY "Users can insert their own comments" ON comments FOR INSERT WITH 
 
 DROP POLICY IF EXISTS "Users can delete their own comments" ON comments;
 CREATE POLICY "Users can delete their own comments" ON comments FOR DELETE USING (auth.uid() = user_id);
+
+-- ===================================================
+-- 7. Create Chat Messages Table
+-- ===================================================
+CREATE TABLE IF NOT EXISTS public.chat_messages (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  username TEXT NOT NULL,
+  avatar_url TEXT,
+  message TEXT NOT NULL CHECK (char_length(message) > 0 AND char_length(message) <= 500),
+  created_at TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+
+-- Enable RLS
+ALTER TABLE public.chat_messages ENABLE ROW LEVEL SECURITY;
+
+-- Policies for Chat Messages
+DROP POLICY IF EXISTS "Chat messages are viewable by everyone" ON public.chat_messages;
+CREATE POLICY "Chat messages are viewable by everyone" ON public.chat_messages FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Users can post chat messages" ON public.chat_messages;
+CREATE POLICY "Users can post chat messages" ON public.chat_messages FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- Index for fast chat loads
+CREATE INDEX IF NOT EXISTS idx_chat_messages_created ON public.chat_messages(created_at DESC);

@@ -1,4 +1,4 @@
-import { Tv, MessageCircle, Search, Check, LogOut, User as UserIcon } from 'lucide-react';
+import { Tv, MessageCircle, Search, Check, LogOut, User as UserIcon, Calendar } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -21,6 +21,10 @@ export function Navbar() {
           <Link to="/browse" className="flex items-center gap-2 hover:text-white" style={{ transition: 'color 0.2s' }}>
             <Search size={16} />
             <span className="hidden sm:inline">Browse</span>
+          </Link>
+          <Link to="/calendar" className="flex items-center gap-2 hover:text-white" style={{ transition: 'color 0.2s' }}>
+            <Calendar size={16} />
+            <span className="hidden sm:inline">Calendar</span>
           </Link>
           <button 
             onClick={() => {

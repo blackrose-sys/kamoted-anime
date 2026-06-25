@@ -6,6 +6,7 @@ import type { AnimeData } from '../components/AnimeCard';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { Play, AlertCircle, RefreshCw } from 'lucide-react';
+import { ChatSidebar } from '../components/ChatSidebar';
 
 // --- Caching Layer ---
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
@@ -410,6 +411,7 @@ export function Home() {
         </aside>
 
       </div>
+      <ChatSidebar />
     </main>
   );
 }

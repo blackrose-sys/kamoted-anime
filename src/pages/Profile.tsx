@@ -11,6 +11,20 @@ export function Profile() {
   const [activeTab, setActiveTab] = useState<'settings' | 'watchlist' | 'history'>('settings');
   const [watchlist, setWatchlist] = useState<any[]>([]);
   const [history, setHistory] = useState<any[]>([]);
+  const [selectedWatchlistCategory, setSelectedWatchlistCategory] = useState<string>('all');
+
+  // Gamification state
+  const [stats, setStats] = useState({
+    level: 1,
+    xp: 0,
+    nextLevelXp: 100,
+    episodesCount: 0,
+    commentsCount: 0,
+    showsCount: 0,
+    completedCount: 0,
+    badges: [] as { id: string; name: string; description: string; icon: string; unlocked: boolean }[]
+  });
+  const [statsLoading, setStatsLoading] = useState(true);
 
   // Username form states
   const [usernameInput, setUsernameInput] = useState('');
@@ -35,6 +49,60 @@ export function Profile() {
       setUsernameInput(user.username || '');
       setPrivacy(user.watchlist_privacy || 'public');
       
+      const loadGamificationStats = async () => {
+        try {
+          // 1. Get watch history
+          const { data: historyData } = await supabase
+            .from('watch_history')
+            .select('last_episode')
+            .eq('user_id', user.id);
+            
+          const showsCount = historyData?.length || 0;
+          const episodesCount = historyData?.reduce((sum, item) => sum + (item.last_episode || 0), 0) || 0;
+
+          // 2. Get comments count
+          const { count: commentsCount } = await supabase
+            .from('comments')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', user.id);
+
+          // 3. Get completed watchlist items count
+          const { count: completedCount } = await supabase
+            .from('watchlists')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+            .eq('status', 'completed');
+
+          // Calculate XP
+          const totalXp = (episodesCount * 10) + ((commentsCount || 0) * 15);
+          const level = Math.floor(totalXp / 100) + 1;
+          const xpInCurrentLevel = totalXp % 100;
+
+          setStats({
+            level,
+            xp: xpInCurrentLevel,
+            nextLevelXp: 100,
+            episodesCount,
+            commentsCount: commentsCount || 0,
+            showsCount,
+            completedCount: completedCount || 0,
+            badges: [
+              { id: 'rookie', name: 'Rookie Watcher', description: 'Joined the platform', icon: '🏅', unlocked: true },
+              { id: 'otaku', name: 'Otaku Master', description: 'Watched 10+ shows', icon: '🥋', unlocked: showsCount >= 10 },
+              { id: 'legend', name: 'Anime Legend', description: 'Watched 50+ shows', icon: '🌌', unlocked: showsCount >= 50 },
+              { id: 'chatterbox', name: 'Chatterbox', description: 'Left 5+ comments', icon: '💬', unlocked: (commentsCount || 0) >= 5 },
+              { id: 'completionist', name: 'Completionist', description: 'Completed 5+ shows', icon: '📚', unlocked: (completedCount || 0) >= 5 }
+            ]
+          });
+        } catch (err) {
+          console.error('Failed to load gamification stats:', err);
+        } finally {
+          setStatsLoading(false);
+        }
+      };
+
+      loadGamificationStats();
+
       if (activeTab === 'watchlist') {
         supabase.from('watchlists').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
           .then(({ data }) => setWatchlist(data || []));
@@ -282,6 +350,82 @@ export function Profile() {
       {/* Main Glassmorphism Card */}
       <div className="glass" style={{ width: '100%', maxWidth: '800px', padding: '3rem', borderRadius: '1.25rem', border: '1px solid var(--border-color)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', position: 'relative' }}>
         
+        {/* Gamification Dashboard */}
+        {!statsLoading && (
+          <div style={{
+            display: 'flex',
+            flexDirection: 'row',
+            gap: '2rem',
+            alignItems: 'center',
+            backgroundColor: 'rgba(255,255,255,0.02)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '1rem',
+            padding: '1.5rem',
+            marginBottom: '2.5rem',
+            flexWrap: 'wrap'
+          }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: '150px' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Watcher Level
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.25rem' }}>
+                <span style={{ fontSize: '2.25rem', fontWeight: 900, color: 'var(--accent-primary)', textShadow: '0 0 15px rgba(245,158,11,0.2)' }}>Lvl {stats.level}</span>
+              </div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                {stats.episodesCount} episodes watched
+              </div>
+            </div>
+            
+            <div style={{ flex: 1, minWidth: '200px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                <span>XP PROGRESS</span>
+                <span>{stats.xp} / {stats.nextLevelXp} XP</span>
+              </div>
+              <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--bg-color-tertiary)', borderRadius: '9999px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+                <div style={{ width: `${(stats.xp / stats.nextLevelXp) * 100}%`, height: '100%', background: 'linear-gradient(90deg, var(--accent-primary), #8b5cf6)', borderRadius: '9999px', boxShadow: '0 0 10px rgba(245,158,11,0.5)' }} />
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                {100 - stats.xp} XP to next level
+              </div>
+            </div>
+
+            <div style={{ width: '100%', height: '1px', backgroundColor: 'var(--border-color)' }} />
+
+            <div style={{ width: '100%' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>
+                Unlocked Achievements
+              </div>
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                {stats.badges.map(badge => (
+                  <div 
+                    key={badge.id} 
+                    title={badge.description}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.5rem 0.75rem',
+                      borderRadius: '0.5rem',
+                      backgroundColor: badge.unlocked ? 'rgba(245, 158, 11, 0.1)' : 'rgba(255, 255, 255, 0.02)',
+                      border: `1px solid ${badge.unlocked ? 'var(--accent-primary)' : 'var(--border-color)'}`,
+                      opacity: badge.unlocked ? 1 : 0.4,
+                      transition: 'all 0.2s',
+                      boxShadow: badge.unlocked ? '0 0 15px rgba(245,158,11,0.15)' : 'none',
+                      cursor: 'help'
+                    }}
+                  >
+                    <span style={{ fontSize: '1.25rem' }}>{badge.icon}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: badge.unlocked ? 'white' : 'var(--text-secondary)' }}>{badge.name}</span>
+                      <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>{badge.description}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+        
         {/* TAB 1: SETTINGS */}
         {activeTab === 'settings' && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2.5rem' }}>
@@ -491,40 +635,85 @@ export function Profile() {
         )}
 
         {/* TAB 2: WATCHLIST */}
-        {activeTab === 'watchlist' && (
-          <div>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: '2rem', textTransform: 'uppercase', letterSpacing: '-0.01em' }}>My Watchlist</h2>
-            {watchlist.length === 0 ? (
-              <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '4rem 2rem' }}>
-                <Bookmark size={40} style={{ color: 'var(--border-color)', marginBottom: '1rem' }} />
-                <div>You haven't bookmarked any anime yet!</div>
-                <Link to="/" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 700, display: 'inline-block', marginTop: '1rem' }}>Browse Shows</Link>
-              </div>
-            ) : (
-              <div className="grid">
-                {watchlist.map(item => (
-                  <div key={item.id} style={{ position: 'relative' }}>
-                    <Link to={`/watch/${item.anime_id}`} className="hover-scale" style={{ display: 'block', backgroundColor: 'var(--bg-color-secondary)', borderRadius: '1rem', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
-                      <div style={{ width: '100%', aspectRatio: '2/3', position: 'relative' }}>
-                        <img src={item.image_url} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      </div>
-                      <div style={{ padding: '0.75rem' }}>
-                        <h3 style={{ fontSize: '0.875rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</h3>
-                      </div>
-                    </Link>
-                    <button 
-                      onClick={() => removeFromWatchlist(item.anime_id)}
-                      style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', backgroundColor: 'rgba(239, 68, 68, 0.95)', color: 'white', border: 'none', padding: '0.5rem', borderRadius: '0.5rem', cursor: 'pointer', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                      className="hover-scale"
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
+        {activeTab === 'watchlist' && (() => {
+          const filtered = watchlist.filter(item => {
+            const status = item.status || 'watching';
+            if (selectedWatchlistCategory === 'all') return true;
+            return status === selectedWatchlistCategory;
+          });
+          return (
+            <div>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: '2rem', textTransform: 'uppercase', letterSpacing: '-0.01em' }}>My Watchlist</h2>
+              
+              {/* Category tabs */}
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                {[
+                  { value: 'all', label: 'All' },
+                  { value: 'watching', label: 'Watching' },
+                  { value: 'plan_to_watch', label: 'Plan to Watch' },
+                  { value: 'completed', label: 'Completed' },
+                  { value: 'on_hold', label: 'On Hold' },
+                  { value: 'dropped', label: 'Dropped' }
+                ].map(cat => (
+                  <button
+                    key={cat.value}
+                    type="button"
+                    onClick={() => setSelectedWatchlistCategory(cat.value)}
+                    style={{
+                      padding: '0.4rem 0.8rem',
+                      borderRadius: '0.5rem',
+                      backgroundColor: selectedWatchlistCategory === cat.value ? 'var(--accent-primary)' : 'rgba(255,255,255,0.03)',
+                      color: selectedWatchlistCategory === cat.value ? 'black' : 'white',
+                      border: '1px solid var(--border-color)',
+                      fontWeight: 700,
+                      fontSize: '0.8rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    {cat.label} ({
+                      cat.value === 'all' 
+                        ? watchlist.length 
+                        : watchlist.filter(item => (item.status || 'watching') === cat.value).length
+                    })
+                  </button>
                 ))}
               </div>
-            )}
-          </div>
-        )}
+
+              {filtered.length === 0 ? (
+                <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '4rem 2rem' }}>
+                  <Bookmark size={40} style={{ color: 'var(--border-color)', marginBottom: '1rem' }} />
+                  <div>No anime found in this folder!</div>
+                  {selectedWatchlistCategory === 'all' && (
+                    <Link to="/" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 700, display: 'inline-block', marginTop: '1rem' }}>Browse Shows</Link>
+                  )}
+                </div>
+              ) : (
+                <div className="grid">
+                  {filtered.map(item => (
+                    <div key={item.id} style={{ position: 'relative' }}>
+                      <Link to={`/watch/${item.anime_id}`} className="hover-scale" style={{ display: 'block', backgroundColor: 'var(--bg-color-secondary)', borderRadius: '1rem', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+                        <div style={{ width: '100%', aspectRatio: '2/3', position: 'relative' }}>
+                          <img src={item.image_url} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </div>
+                        <div style={{ padding: '0.75rem' }}>
+                          <h3 style={{ fontSize: '0.875rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</h3>
+                        </div>
+                      </Link>
+                      <button 
+                        onClick={() => removeFromWatchlist(item.anime_id)}
+                        style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', backgroundColor: 'rgba(239, 68, 68, 0.95)', color: 'white', border: 'none', padding: '0.5rem', borderRadius: '0.5rem', cursor: 'pointer', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        className="hover-scale"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* TAB 3: WATCH HISTORY */}
         {activeTab === 'history' && (

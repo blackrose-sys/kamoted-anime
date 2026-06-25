@@ -117,6 +117,7 @@ export function ChatSidebar() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const emojiTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isOpenRef = useRef(isOpen);
   const MAX_CHARS = 500;
 
@@ -437,8 +438,13 @@ export function ChatSidebar() {
                       transition: 'opacity 0.2s',
                       position: 'relative'
                     }}
-                    onMouseEnter={() => setShowEmojiBar(msg.id)}
-                    onMouseLeave={() => setShowEmojiBar(null)}
+                    onMouseEnter={() => {
+                      if (emojiTimer.current) clearTimeout(emojiTimer.current);
+                      setShowEmojiBar(msg.id);
+                    }}
+                    onMouseLeave={() => {
+                      emojiTimer.current = setTimeout(() => setShowEmojiBar(null), 250);
+                    }}
                   >
                     {/* Avatar column */}
                     <div style={{ width: '30px', flexShrink: 0, display: 'flex', justifyContent: 'center' }}>
@@ -511,8 +517,13 @@ export function ChatSidebar() {
                           padding: '0.28rem 0.5rem', zIndex: 20,
                           boxShadow: '0 8px 24px rgba(0,0,0,0.6)'
                         }}
-                        onMouseEnter={() => setShowEmojiBar(msg.id)}
-                        onMouseLeave={() => setShowEmojiBar(null)}
+                        onMouseEnter={() => {
+                          if (emojiTimer.current) clearTimeout(emojiTimer.current);
+                          setShowEmojiBar(msg.id);
+                        }}
+                        onMouseLeave={() => {
+                          emojiTimer.current = setTimeout(() => setShowEmojiBar(null), 250);
+                        }}
                       >
                         {EMOJIS.map(emoji => (
                           <button

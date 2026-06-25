@@ -213,6 +213,8 @@ export function Watch() {
                 height="100%" 
                 frameBorder="0" 
                 allowFullScreen 
+                sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
+                allow="autoplay; encrypted-media; picture-in-picture"
                 style={{ backgroundColor: 'black' }}
                 key={`${selectedServer.id}-${selectedEpisode}-${type}`}
               />

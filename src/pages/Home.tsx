@@ -6,6 +6,7 @@ import { AnimeCard } from '../components/AnimeCard';
 import type { AnimeData } from '../components/AnimeCard';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { getAnimeDetails } from '../lib/animeServers';
 import { Play, AlertCircle, RefreshCw } from 'lucide-react';
 import { ChatSidebar } from '../components/ChatSidebar';
 
@@ -292,7 +293,23 @@ export function Home() {
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false })
       .limit(6)
-      .then(({ data }) => setHistory(data || []));
+      .then(async ({ data }) => {
+        const items = data || [];
+        setHistory(items);
+        for (const item of items) {
+          if (!item.title || item.title === 'Loading...' || !item.image_url || item.image_url === '' || item.image_url === 'Loading...') {
+            try {
+              const resolved = await getAnimeDetails(item.anime_id);
+              if (resolved.title || resolved.image_url) {
+                const newTitle = (resolved.title && resolved.title !== 'Loading...') ? resolved.title : (item.title !== 'Loading...' ? item.title : `Anime #${item.anime_id}`);
+                const newImg = resolved.image_url || item.image_url;
+                setHistory(prev => prev.map(h => h.id === item.id ? { ...h, title: newTitle, image_url: newImg } : h));
+                supabase.from('watch_history').update({ title: newTitle, image_url: newImg }).eq('id', item.id).then();
+              }
+            } catch (e) { /* ignore */ }
+          }
+        }
+      });
 
     // 2. Check if genre preferences exist, else show Quiz
     supabase.from('profiles')

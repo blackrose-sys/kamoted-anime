@@ -46,6 +46,8 @@ export interface AniListMetadata {
   anilistId: string | null;
   episodes: number | null;
   status: string | null;
+  title: string | null;
+  coverImage: string | null;
 }
 
 /**
@@ -54,10 +56,15 @@ export interface AniListMetadata {
 export async function fetchAniListMetadata(malId: string): Promise<AniListMetadata> {
   const cacheKey = `anilist_metadata_${malId}`;
   
-  // Check cache first
+  // Check cache first - make sure title & coverImage are present in cached object
   try {
     const cached = sessionStorage.getItem(cacheKey);
-    if (cached) return JSON.parse(cached);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (parsed && parsed.title && parsed.coverImage) {
+        return parsed;
+      }
+    }
   } catch { /* ignore */ }
 
   try {
@@ -69,6 +76,15 @@ export async function fetchAniListMetadata(malId: string): Promise<AniListMetada
           episodes
           nextAiringEpisode {
             episode
+          }
+          title {
+            english
+            romaji
+            userPreferred
+          }
+          coverImage {
+            large
+            extraLarge
           }
         }
       }
@@ -91,20 +107,55 @@ export async function fetchAniListMetadata(malId: string): Promise<AniListMetada
       episodes = media.nextAiringEpisode.episode - 1;
     }
     
+    const title = media?.title?.english || media?.title?.romaji || media?.title?.userPreferred || null;
+    const coverImage = media?.coverImage?.extraLarge || media?.coverImage?.large || null;
+    
     const metadata = {
       anilistId,
       episodes,
-      status: media?.status || null
+      status: media?.status || null,
+      title,
+      coverImage
     };
     
-    // Cache the result
-    try { sessionStorage.setItem(cacheKey, JSON.stringify(metadata)); } catch { /* ignore */ }
+    // Cache the result if title exists
+    if (title) {
+      try { sessionStorage.setItem(cacheKey, JSON.stringify(metadata)); } catch { /* ignore */ }
+    }
     
     return metadata;
   } catch (error) {
     console.error('Failed to fetch AniList metadata:', error);
-    return { anilistId: null, episodes: null, status: null };
+    return { anilistId: null, episodes: null, status: null, title: null, coverImage: null };
   }
+}
+
+/**
+ * Robust helper to resolve anime title and cover image across AniList and Jikan APIs.
+ */
+export async function getAnimeDetails(malId: string | number): Promise<{ title: string; image_url: string }> {
+  const idStr = malId.toString();
+  
+  // 1. Try AniList first
+  try {
+    const meta = await fetchAniListMetadata(idStr);
+    if (meta.title && meta.coverImage) {
+      return { title: meta.title, image_url: meta.coverImage };
+    }
+  } catch (e) { /* ignore */ }
+
+  // 2. Try Jikan as fallback
+  try {
+    const res = await fetch(`https://api.jikan.moe/v4/anime/${idStr}`);
+    if (res.ok) {
+      const data = await res.json();
+      const title = data?.data?.title_english || data?.data?.title || `Anime #${idStr}`;
+      const image_url = data?.data?.images?.webp?.large_image_url || data?.data?.images?.jpg?.large_image_url || '';
+      return { title, image_url };
+    }
+  } catch (e) { /* ignore */ }
+
+  return { title: `Anime #${idStr}`, image_url: '' };
 }
 
 /**

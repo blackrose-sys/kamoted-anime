@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { Navigate, Link } from 'react-router-dom';
 import { Loader2, Bookmark, Clock, Trash2, Play, Camera, X, Check, Save, User, Mail, ZoomIn, ZoomOut, Globe, Lock, List } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { getAnimeDetails } from '../lib/animeServers';
 
 export function Profile() {
   const { user, updateUser, isLoading } = useAuth();
@@ -106,10 +107,44 @@ export function Profile() {
 
       if (activeTab === 'watchlist') {
         supabase.from('watchlists').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
-          .then(({ data }) => setWatchlist(data || []));
+          .then(async ({ data }) => {
+            const items = data || [];
+            setWatchlist(items);
+            // Auto-repair any items saved with broken/loading titles or images
+            for (const item of items) {
+              if (!item.title || item.title === 'Loading...' || !item.image_url || item.image_url === '' || item.image_url === 'Loading...') {
+                try {
+                  const resolved = await getAnimeDetails(item.anime_id);
+                  if (resolved.title || resolved.image_url) {
+                    const newTitle = (resolved.title && resolved.title !== 'Loading...') ? resolved.title : (item.title !== 'Loading...' ? item.title : `Anime #${item.anime_id}`);
+                    const newImg = resolved.image_url || item.image_url;
+                    setWatchlist(prev => prev.map(w => w.id === item.id ? { ...w, title: newTitle, image_url: newImg } : w));
+                    supabase.from('watchlists').update({ title: newTitle, image_url: newImg }).eq('id', item.id).then();
+                  }
+                } catch (e) { /* ignore */ }
+              }
+            }
+          });
       } else if (activeTab === 'history') {
         supabase.from('watch_history').select('*').eq('user_id', user.id).order('updated_at', { ascending: false })
-          .then(({ data }) => setHistory(data || []));
+          .then(async ({ data }) => {
+            const items = data || [];
+            setHistory(items);
+            // Auto-repair any history items saved with broken/loading titles or images
+            for (const item of items) {
+              if (!item.title || item.title === 'Loading...' || !item.image_url || item.image_url === '' || item.image_url === 'Loading...') {
+                try {
+                  const resolved = await getAnimeDetails(item.anime_id);
+                  if (resolved.title || resolved.image_url) {
+                    const newTitle = (resolved.title && resolved.title !== 'Loading...') ? resolved.title : (item.title !== 'Loading...' ? item.title : `Anime #${item.anime_id}`);
+                    const newImg = resolved.image_url || item.image_url;
+                    setHistory(prev => prev.map(h => h.id === item.id ? { ...h, title: newTitle, image_url: newImg } : h));
+                    supabase.from('watch_history').update({ title: newTitle, image_url: newImg }).eq('id', item.id).then();
+                  }
+                } catch (e) { /* ignore */ }
+              }
+            }
+          });
       } else if (activeTab === 'lists') {
         supabase.from('anime_lists').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
           .then(async ({ data }) => {

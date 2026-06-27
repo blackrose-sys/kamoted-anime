@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Search, ChevronDown, BookmarkPlus, BookmarkCheck, Server, SkipForward, ChevronRight, ChevronLeft, ToggleLeft, ToggleRight, Check, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { animeServers, getServerUrl, fetchAniListMetadata, type AnimeServer } from '../lib/animeServers';
+import { animeServers, getServerUrl, fetchAniListMetadata, getAnimeDetails, type AnimeServer } from '../lib/animeServers';
 import { CommentSection } from '../components/CommentSection';
 
 export function Watch() {
@@ -39,65 +39,85 @@ export function Watch() {
     if (id) {
       const cacheBuster = Date.now();
       
-      // 1. Fetch AniList Metadata (for exact real-time episode counts)
+      // 1. Fetch AniList Metadata FIRST — it's the primary source for title, image, anilistId, and episodes
+      //    AniList is more reliable and doesn't rate-limit as aggressively as Jikan
       fetchAniListMetadata(id)
         .then(metadata => {
           if (metadata.anilistId) setAnilistId(metadata.anilistId);
           if (metadata.episodes) {
             setTotalEpisodes(metadata.episodes);
           }
-        })
-        .catch(console.error);
-
-      // 2. Fetch Jikan Anime Details (for title, images, and fallback episodes)
-      fetch(`https://api.jikan.moe/v4/anime/${id}?_=${cacheBuster}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data && data.data) {
-            setAnimeName(data.data.title);
-            setAnimeImage(data.data.images?.webp?.large_image_url || '');
-            
-            // If AniList count didn't load, use this fallback
-            if (data.data.episodes) {
-              setTotalEpisodes(prev => prev || data.data.episodes);
-            }
-            
-            // Try to get AniList ID from url (secondary fallback)
-            if (data.data.url) {
-              const anilistMatch = data.data.url.match(/anilist\.co\/anime\/(\d+)/);
-              if (anilistMatch) {
-                setAnilistId(prev => prev || anilistMatch[1]);
-              }
-            }
+          // Use AniList title and cover as primary source
+          if (metadata.title) {
+            setAnimeName(prev => prev === 'Loading...' ? metadata.title! : prev);
+          }
+          if (metadata.coverImage) {
+            setAnimeImage(prev => prev === '' ? metadata.coverImage! : prev);
           }
         })
         .catch(console.error);
 
-      // 3. Fetch Jikan Relations (for Seasons & sequels/prequels)
-      fetch(`https://api.jikan.moe/v4/anime/${id}/relations`)
-        .then(res => res.json())
-        .then(data => {
-          if (data && data.data) {
-            const relevantRelations: any[] = [];
-            const allowedTypes = ['Prequel', 'Sequel', 'Alternative version', 'Alternative setting', 'Parent story', 'Full story', 'Spin-off', 'Side story'];
-            
-            data.data.forEach((rel: any) => {
-              if (allowedTypes.includes(rel.relation)) {
-                rel.entry.forEach((entry: any) => {
-                  if (entry.type === 'anime') {
-                    relevantRelations.push({
-                      relation: rel.relation,
-                      mal_id: entry.mal_id,
-                      name: entry.name
-                    });
-                  }
-                });
+      // 2. Fetch Jikan Anime Details (for fallback title, images, and episode count)
+      //    Uses a small delay to avoid hitting Jikan rate limits when navigating quickly
+      const jikanTimer = setTimeout(() => {
+        fetch(`https://api.jikan.moe/v4/anime/${id}?_=${cacheBuster}`)
+          .then(res => {
+            if (!res.ok) throw new Error(`Jikan returned ${res.status}`);
+            return res.json();
+          })
+          .then(data => {
+            if (data && data.data) {
+              // Only overwrite if we still have placeholder values
+              setAnimeName(prev => prev === 'Loading...' ? (data.data.title || prev) : prev);
+              setAnimeImage(prev => prev === '' ? (data.data.images?.webp?.large_image_url || '') : prev);
+              
+              // If AniList count didn't load, use this fallback
+              if (data.data.episodes) {
+                setTotalEpisodes(prev => prev === 12 ? data.data.episodes : prev);
               }
-            });
-            setRelations(relevantRelations);
-          }
-        })
-        .catch(console.error);
+              
+              // Try to get AniList ID from url (secondary fallback)
+              if (data.data.url) {
+                const anilistMatch = data.data.url.match(/anilist\.co\/anime\/(\d+)/);
+                if (anilistMatch) {
+                  setAnilistId(prev => prev || anilistMatch[1]);
+                }
+              }
+            }
+          })
+          .catch(err => console.warn('Jikan detail fetch failed (rate limited?):', err));
+      }, 350);
+
+      // 3. Fetch Jikan Relations (for Seasons & sequels/prequels) — delayed to avoid rate limit
+      const relTimer = setTimeout(() => {
+        fetch(`https://api.jikan.moe/v4/anime/${id}/relations`)
+          .then(res => {
+            if (!res.ok) throw new Error(`Jikan relations returned ${res.status}`);
+            return res.json();
+          })
+          .then(data => {
+            if (data && data.data) {
+              const relevantRelations: any[] = [];
+              const allowedTypes = ['Prequel', 'Sequel', 'Alternative version', 'Alternative setting', 'Parent story', 'Full story', 'Spin-off', 'Side story'];
+              
+              data.data.forEach((rel: any) => {
+                if (allowedTypes.includes(rel.relation)) {
+                  rel.entry.forEach((entry: any) => {
+                    if (entry.type === 'anime') {
+                      relevantRelations.push({
+                        relation: rel.relation,
+                        mal_id: entry.mal_id,
+                        name: entry.name
+                      });
+                    }
+                  });
+                }
+              });
+              setRelations(relevantRelations);
+            }
+          })
+          .catch(err => console.warn('Jikan relations fetch failed:', err));
+      }, 750);
 
       // 4. Sync Watchlist & Watch History from Supabase
       if (user) {
@@ -128,17 +148,34 @@ export function Watch() {
           });
       }
 
-      // 5. Fetch Jikan Recommendations
+      // 5. Fetch Jikan Recommendations — delayed even more to avoid rate limit stacking
       setRecommendationsLoading(true);
-      fetch(`https://api.jikan.moe/v4/anime/${id}/recommendations`)
-        .then(res => res.json())
-        .then(data => {
-          if (data && data.data) {
-            setRecommendations(data.data.slice(0, 10));
-          }
-        })
-        .catch(console.error)
-        .finally(() => setRecommendationsLoading(false));
+      const recTimer = setTimeout(() => {
+        fetch(`https://api.jikan.moe/v4/anime/${id}/recommendations`)
+          .then(res => {
+            if (!res.ok) throw new Error(`Jikan recommendations returned ${res.status}`);
+            return res.json();
+          })
+          .then(data => {
+            if (data && data.data) {
+              setRecommendations(data.data.slice(0, 10));
+            }
+          })
+          .catch(err => console.warn('Jikan recommendations fetch failed:', err))
+          .finally(() => setRecommendationsLoading(false));
+      }, 1200);
+
+      // Final safety check to ensure animeName is never stuck on "Loading..."
+      const fallbackTimer = setTimeout(() => {
+        setAnimeName(prev => (prev === 'Loading...' ? `Anime #${id}` : prev));
+      }, 2500);
+
+      return () => {
+        clearTimeout(jikanTimer);
+        clearTimeout(relTimer);
+        clearTimeout(recTimer);
+        clearTimeout(fallbackTimer);
+      };
     }
   }, [id, user]);
 
@@ -166,18 +203,28 @@ export function Watch() {
         if (error) throw error;
         setInWatchlist(false);
       } else {
+        let validTitle = animeName;
+        let validImage = animeImage;
+        if (validTitle === 'Loading...' || !validImage) {
+          const resolved = await getAnimeDetails(id);
+          if (validTitle === 'Loading...') validTitle = resolved.title;
+          if (!validImage) validImage = resolved.image_url;
+        }
+
         const { error } = await supabase
           .from('watchlists')
           .upsert({
             user_id: user.id,
             anime_id: parseInt(id),
-            title: animeName,
-            image_url: animeImage,
+            title: validTitle,
+            image_url: validImage,
             status: status
           }, { onConflict: 'user_id, anime_id' });
         if (error) throw error;
         setInWatchlist(true);
         setWatchlistStatus(status);
+        if (validTitle !== 'Loading...') setAnimeName(validTitle);
+        if (validImage) setAnimeImage(validImage);
       }
     } catch (err) {
       console.error('Failed to update watchlist status:', err);
@@ -189,12 +236,20 @@ export function Watch() {
 
   const handleEpisodeClick = async (epNum: number) => {
     setSelectedEpisode(epNum);
-    if (user && id && animeImage) {
+    if (user && id) {
+      let validTitle = animeName;
+      let validImage = animeImage;
+      if (validTitle === 'Loading...' || !validImage) {
+        const resolved = await getAnimeDetails(id);
+        if (validTitle === 'Loading...') validTitle = resolved.title;
+        if (!validImage) validImage = resolved.image_url;
+      }
+
       await supabase.from('watch_history').upsert({
         user_id: user.id,
         anime_id: parseInt(id),
-        title: animeName,
-        image_url: animeImage,
+        title: validTitle,
+        image_url: validImage,
         last_episode: epNum,
         updated_at: new Date().toISOString()
       }, { onConflict: 'user_id, anime_id' });

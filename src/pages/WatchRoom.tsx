@@ -2,8 +2,8 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { Users, Play, Pause, Copy, Check, ArrowLeft, Crown, Loader2, Wifi, Server, ChevronDown } from 'lucide-react';
-import { animeServers, getServerUrl, fetchAniListMetadata } from '../lib/animeServers';
+import { Users, Play, Pause, Copy, Check, ArrowLeft, Crown, Loader2, Wifi, Server, ChevronDown, RefreshCw } from 'lucide-react';
+import { animeServers, getServerUrl, fetchAniListMetadata, getAnimeDetails } from '../lib/animeServers';
 
 interface RoomMember {
   user_id: string;
@@ -47,6 +47,8 @@ export function WatchRoom() {
   const [showServerDropdown, setShowServerDropdown] = useState(false);
   const [type, setType] = useState<'sub' | 'dub'>('sub');
   const [anilistId, setAnilistId] = useState<string>('');
+  const [animeCover, setAnimeCover] = useState<string>('');
+  const [syncNonce, setSyncNonce] = useState<number>(Date.now());
   
   const channelRef = useRef<any>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -67,11 +69,11 @@ export function WatchRoom() {
       if (err || !data) { setError('Room not found or has ended.'); setLoading(false); return; }
       setRoom(data as WatchRoom);
 
-      // Fetch anime title
+      // Fetch anime title & cover details robustly
       try {
-        const res = await fetch(`https://api.jikan.moe/v4/anime/${data.anime_id}`);
-        const json = await res.json();
-        setAnimeTitle(json.data?.title_english || json.data?.title || `Anime #${data.anime_id}`);
+        const details = await getAnimeDetails(data.anime_id);
+        if (details.title) setAnimeTitle(details.title);
+        if (details.image_url) setAnimeCover(details.image_url);
       } catch { setAnimeTitle(`Anime #${data.anime_id}`); }
 
       // Fetch AniList metadata for servers that require AniList ID
@@ -94,6 +96,9 @@ export function WatchRoom() {
       })
       .on('broadcast', { event: 'room_update' }, (payload) => {
         setRoom(prev => prev ? { ...prev, ...payload.payload } : null);
+        if (payload.payload?.syncNonce !== undefined) {
+          setSyncNonce(payload.payload.syncNonce);
+        }
       })
       .on('broadcast', { event: 'chat' }, (payload) => {
         setChatMessages(prev => [...prev, payload.payload]);
@@ -135,38 +140,63 @@ export function WatchRoom() {
   const handlePlayPause = async () => {
     if (!room || !isHost) return;
     const nextPlaying = !room.is_playing;
+    const nextNonce = Date.now();
     
-    await supabase.from('watch_rooms').update({
-      is_playing: nextPlaying,
-      updated_at: new Date().toISOString()
-    }).eq('id', room.id);
+    // 1. Instant optimistic local update & WebSocket broadcast
+    setRoom(prev => prev ? { ...prev, is_playing: nextPlaying } : null);
+    setSyncNonce(nextNonce);
 
     if (channelRef.current) {
       channelRef.current.send({
         type: 'broadcast',
         event: 'room_update',
-        payload: { is_playing: nextPlaying }
+        payload: { is_playing: nextPlaying, syncNonce: nextNonce }
       });
     }
 
-    setRoom(prev => prev ? { ...prev, is_playing: nextPlaying } : null);
+    // 2. Persist to DB in background
+    await supabase.from('watch_rooms').update({
+      is_playing: nextPlaying,
+      updated_at: new Date().toISOString()
+    }).eq('id', room.id);
   };
 
   const handleEpisodeChange = async (delta: number) => {
     if (!room || !isHost) return;
     const newEp = Math.max(1, room.episode + delta);
+    const nextNonce = Date.now();
 
-    await supabase.from('watch_rooms').update({ episode: newEp, current_time: 0, is_playing: false, updated_at: new Date().toISOString() }).eq('id', room.id);
+    // 1. Instant optimistic local update & WebSocket broadcast
+    setRoom(prev => prev ? { ...prev, episode: newEp, is_playing: true } : null);
+    setSyncNonce(nextNonce);
 
     if (channelRef.current) {
       channelRef.current.send({
         type: 'broadcast',
         event: 'room_update',
-        payload: { episode: newEp, is_playing: false }
+        payload: { episode: newEp, is_playing: true, syncNonce: nextNonce }
       });
     }
 
-    setRoom(prev => prev ? { ...prev, episode: newEp, is_playing: false } : null);
+    // 2. Persist to DB in background
+    await supabase.from('watch_rooms').update({
+      episode: newEp,
+      current_time: 0,
+      is_playing: true,
+      updated_at: new Date().toISOString()
+    }).eq('id', room.id);
+  };
+
+  const handleResyncStream = () => {
+    const nextNonce = Date.now();
+    setSyncNonce(nextNonce);
+    if (isHost && channelRef.current) {
+      channelRef.current.send({
+        type: 'broadcast',
+        event: 'room_update',
+        payload: { syncNonce: nextNonce }
+      });
+    }
   };
 
   const handleCopyCode = () => {
@@ -237,31 +267,59 @@ export function WatchRoom() {
           </div>
 
           {/* Player embed */}
-          <div style={{ flex: 1, backgroundColor: '#000', position: 'relative' }}>
-            <iframe
-              src={getServerUrl(selectedServer, room?.anime_id.toString() || '', room?.episode || 1, type, anilistId || room?.anime_id.toString() || '')}
-              style={{ width: '100%', height: '100%', border: 'none' }}
-              allowFullScreen
-              allow="autoplay; encrypted-media; picture-in-picture"
-              title="Watch Together Player"
-              key={`${selectedServer.id}-${room?.episode}-${type}-${anilistId}`}
-            />
-            {!room?.is_playing && (
+          <div style={{ flex: 1, backgroundColor: '#000', position: 'relative', overflow: 'hidden' }}>
+            {room?.is_playing ? (
+              <iframe
+                src={getServerUrl(selectedServer, room?.anime_id.toString() || '', room?.episode || 1, type, anilistId || room?.anime_id.toString() || '')}
+                style={{ width: '100%', height: '100%', border: 'none' }}
+                allowFullScreen
+                allow="autoplay; encrypted-media; picture-in-picture"
+                title="Watch Together Player"
+                key={`${selectedServer.id}-${room?.episode}-${type}-${anilistId}-${syncNonce}`}
+              />
+            ) : (
               <div style={{
-                position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)'
+                width: '100%', height: '100%', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                backgroundColor: '#07070d'
               }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '1rem', fontWeight: 800, marginBottom: '0.5rem', color: 'rgba(255,255,255,0.7)' }}>
-                    {isHost ? 'You paused for everyone' : 'Paused by host'}
+                {animeCover && (
+                  <img
+                    src={animeCover}
+                    alt={animeTitle}
+                    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.2, filter: 'blur(30px) brightness(0.6)' }}
+                  />
+                )}
+                <div style={{
+                  position: 'relative', zIndex: 10, textAlign: 'center', padding: '2.5rem 2rem',
+                  backgroundColor: 'rgba(10,10,18,0.85)', backdropFilter: 'blur(20px)',
+                  border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1.5rem',
+                  boxShadow: '0 25px 60px -12px rgba(0,0,0,0.9)', maxWidth: '460px', width: '90%'
+                }}>
+                  {animeCover && (
+                    <div style={{ width: 84, height: 120, borderRadius: '0.75rem', overflow: 'hidden', margin: '0 auto 1.25rem auto', boxShadow: '0 12px 30px rgba(0,0,0,0.7)', border: '1px solid rgba(255,255,255,0.15)' }}>
+                      <img src={animeCover} alt={animeTitle} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    </div>
+                  )}
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.3rem 0.85rem', borderRadius: '9999px', backgroundColor: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)', color: 'var(--accent-primary)', fontSize: '0.75rem', fontWeight: 800, marginBottom: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    <Pause size={13} fill="var(--accent-primary)" /> {isHost ? 'Stream Paused by You' : 'Stream Paused by Host'}
                   </div>
-                  {isHost && (
+                  <h2 style={{ fontSize: '1.3rem', fontWeight: 900, marginBottom: '0.3rem', color: 'white', lineHeight: 1.2 }}>{animeTitle}</h2>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.75rem', fontWeight: 700 }}>Episode {room?.episode}</p>
+                  
+                  {isHost ? (
                     <button
                       onClick={handlePlayPause}
-                      style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.75rem', borderRadius: '9999px', background: 'linear-gradient(135deg, var(--accent-primary), #d97706)', border: 'none', color: 'black', fontWeight: 900, fontSize: '0.9rem', cursor: 'pointer', margin: '0 auto' }}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem', padding: '0.85rem 2rem', borderRadius: '9999px', background: 'linear-gradient(135deg, var(--accent-primary), #d97706)', border: 'none', color: 'black', fontWeight: 900, fontSize: '0.95rem', cursor: 'pointer', boxShadow: '0 8px 25px rgba(245,158,11,0.4)', transition: 'transform 0.15s' }}
+                      onMouseOver={e => e.currentTarget.style.transform = 'scale(1.04)'}
+                      onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}
                     >
-                      <Play size={18} fill="black" /> Resume for Everyone
+                      <Play size={20} fill="black" /> Resume Stream for Everyone
                     </button>
+                  ) : (
+                    <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontWeight: 700 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#f59e0b', display: 'inline-block' }} className="animate-pulse" />
+                      Waiting for host to resume stream...
+                    </div>
                   )}
                 </div>
               </div>
@@ -279,6 +337,14 @@ export function WatchRoom() {
                 <button onClick={() => handleEpisodeChange(1)} style={{ padding: '0.6rem 1rem', borderRadius: '9999px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', cursor: 'pointer', fontWeight: 800, fontSize: '0.8rem' }}>Next Ep →</button>
               </>
             ) : null}
+
+            <button
+              onClick={handleResyncStream}
+              title="Resync Stream for Everyone"
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1rem', borderRadius: '9999px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', cursor: 'pointer', fontWeight: 800, fontSize: '0.8rem' }}
+            >
+              <RefreshCw size={14} /> Resync
+            </button>
 
             {/* Common Stream Customizations (Available to Host & Guest) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>

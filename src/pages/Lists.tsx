@@ -106,65 +106,42 @@ export function Lists() {
     }
   }, [user]);
 
-  // Real-time subscription for lists changes
+  // Real-time subscription for lists, items, and likes changes
   useEffect(() => {
     const channel = supabase
-      .channel('public:anime_lists')
+      .channel('public:anime_lists_realtime')
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*',
           schema: 'public',
           table: 'anime_lists',
         },
-        async (payload) => {
-          const updatedList = payload.new as AnimeList;
-          const { data: itemsData } = await supabase
-            .from('anime_list_items')
-            .select('*')
-            .eq('list_id', updatedList.id)
-            .order('position', { ascending: true });
-          
-          updatedList.items = itemsData || [];
-
-          setAllLists(prev =>
-            prev.map(l => (l.id === updatedList.id ? updatedList : l))
-          );
+        () => {
+          fetchLists();
         }
       )
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
-          table: 'anime_lists',
+          table: 'anime_list_items',
         },
-        async (payload) => {
-          const newList = payload.new as AnimeList;
-          const { data: itemsData } = await supabase
-            .from('anime_list_items')
-            .select('*')
-            .eq('list_id', newList.id)
-            .order('position', { ascending: true });
-          
-          newList.items = itemsData || [];
-
-          setAllLists(prev => {
-            if (prev.some(l => l.id === newList.id)) return prev;
-            return [newList, ...prev];
-          });
+        () => {
+          fetchLists();
         }
       )
       .on(
         'postgres_changes',
         {
-          event: 'DELETE',
+          event: '*',
           schema: 'public',
-          table: 'anime_lists',
+          table: 'list_likes',
         },
-        (payload) => {
-          const oldList = payload.old as { id: string };
-          setAllLists(prev => prev.filter(l => l.id !== oldList.id));
+        () => {
+          fetchLists();
+          fetchUserLikes();
         }
       )
       .subscribe();
@@ -172,7 +149,7 @@ export function Lists() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [user]);
 
   // Search anime via Jikan
   useEffect(() => {

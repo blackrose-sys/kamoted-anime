@@ -288,70 +288,120 @@ export function Home() {
     }
     
     // 1. Get user watch history
-    supabase.from('watch_history')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('updated_at', { ascending: false })
-      .limit(6)
-      .then(async ({ data }) => {
-        const items = data || [];
-        setHistory(items);
-        for (const item of items) {
-          if (!item.title || item.title === 'Loading...' || !item.image_url || item.image_url === '' || item.image_url === 'Loading...') {
-            try {
-              const resolved = await getAnimeDetails(item.anime_id);
-              if (resolved.title || resolved.image_url) {
-                const newTitle = (resolved.title && resolved.title !== 'Loading...') ? resolved.title : (item.title !== 'Loading...' ? item.title : `Anime #${item.anime_id}`);
-                const newImg = resolved.image_url || item.image_url;
-                setHistory(prev => prev.map(h => h.id === item.id ? { ...h, title: newTitle, image_url: newImg } : h));
-                supabase.from('watch_history').update({ title: newTitle, image_url: newImg }).eq('id', item.id).then();
-              }
-            } catch (e) { /* ignore */ }
-          }
+    const fetchHistory = async () => {
+      const { data } = await supabase
+        .from('watch_history')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false })
+        .limit(6);
+      
+      const items = data || [];
+      setHistory(items);
+      
+      // Auto-repair missing titles/images
+      items.forEach(async (item) => {
+        if (!item.title || item.title === 'Loading...' || !item.image_url || item.image_url === '' || item.image_url === 'Loading...') {
+          try {
+            const resolved = await getAnimeDetails(item.anime_id);
+            if (resolved.title || resolved.image_url) {
+              const newTitle = (resolved.title && resolved.title !== 'Loading...') ? resolved.title : (item.title !== 'Loading...' ? item.title : `Anime #${item.anime_id}`);
+              const newImg = resolved.image_url || item.image_url;
+              setHistory(prev => prev.map(h => h.id === item.id ? { ...h, title: newTitle, image_url: newImg } : h));
+              supabase.from('watch_history').update({ title: newTitle, image_url: newImg }).eq('id', item.id).then();
+            }
+          } catch (e) { /* ignore */ }
         }
       });
+    };
 
     // 2. Check if genre preferences exist, else show Quiz
-    supabase.from('profiles')
-      .select('genre_prefs')
-      .eq('id', user.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data && (!data.genre_prefs || (Array.isArray(data.genre_prefs) && data.genre_prefs.length === 0) || Object.keys(data.genre_prefs).length === 0)) {
-          setShowQuiz(true);
-        }
-      });
+    const checkGenrePrefs = async () => {
+      supabase.from('profiles')
+        .select('genre_prefs')
+        .eq('id', user.id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data && (!data.genre_prefs || (Array.isArray(data.genre_prefs) && data.genre_prefs.length === 0) || Object.keys(data.genre_prefs).length === 0)) {
+            setShowQuiz(true);
+          }
+        });
+    };
 
     // 3. Get followed users recent activity
-    supabase.from('follows')
-      .select('following_id')
-      .eq('follower_id', user.id)
-      .then(async ({ data: followsData }) => {
-        const followingIds = followsData?.map(f => f.following_id) || [];
-        if (followingIds.length > 0) {
-          const { data: historyItems } = await supabase
-            .from('watch_history')
-            .select('*')
-            .in('user_id', followingIds)
-            .order('updated_at', { ascending: false })
-            .limit(5);
+    const fetchFriendsActivity = async () => {
+      supabase.from('follows')
+        .select('following_id')
+        .eq('follower_id', user.id)
+        .then(async ({ data: followsData }) => {
+          const followingIds = followsData?.map(f => f.following_id) || [];
+          if (followingIds.length > 0) {
+            const { data: historyItems } = await supabase
+              .from('watch_history')
+              .select('*')
+              .in('user_id', followingIds)
+              .order('updated_at', { ascending: false })
+              .limit(5);
 
-          if (historyItems && historyItems.length > 0) {
-            const userIds = Array.from(new Set(historyItems.map(item => item.user_id)));
-            const { data: userProfiles } = await supabase
-              .from('profiles')
-              .select('id, username, avatar_url')
-              .in('id', userIds);
+            if (historyItems && historyItems.length > 0) {
+              const userIds = Array.from(new Set(historyItems.map(item => item.user_id)));
+              const { data: userProfiles } = await supabase
+                .from('profiles')
+                .select('id, username, avatar_url')
+                .in('id', userIds);
 
-            const profileMap = new Map(userProfiles?.map(p => [p.id, p]) || []);
-            const enriched = historyItems.map(item => ({
-              ...item,
-              profile: profileMap.get(item.user_id) || { username: 'Otaku', avatar_url: null }
-            }));
-            setFriendActivity(enriched);
+              const profileMap = new Map(userProfiles?.map(p => [p.id, p]) || []);
+              const enriched = historyItems.map(item => ({
+                ...item,
+                profile: profileMap.get(item.user_id) || { username: 'Otaku', avatar_url: null }
+              }));
+              setFriendActivity(enriched);
+            }
           }
+        });
+    };
+
+    fetchHistory();
+    checkGenrePrefs();
+    fetchFriendsActivity();
+
+    // 4. Real-time Subscription for own Watch History
+    const historyChannel = supabase
+      .channel(`watch-history-live-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'watch_history',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchHistory();
         }
-      });
+      )
+      .subscribe();
+
+    // 5. Real-time Subscription for Friends Watch Activity
+    const friendsChannel = supabase
+      .channel(`friends-activity-live-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'watch_history',
+        },
+        () => {
+          fetchFriendsActivity();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(historyChannel);
+      supabase.removeChannel(friendsChannel);
+    };
   }, [user]);
 
   return (

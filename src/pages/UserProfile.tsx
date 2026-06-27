@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { AnimeCard } from '../components/AnimeCard';
 import { UserBadge } from '../components/UserBadge';
-import { Loader2, Bookmark, Calendar, Lock, Globe, ChevronLeft, UserPlus, UserCheck, Flame } from 'lucide-react';
+import { Loader2, Bookmark, Calendar, Lock, Globe, ChevronLeft, ChevronRight, UserPlus, UserCheck, Flame } from 'lucide-react';
 
 interface ProfileData {
   id: string;
@@ -69,6 +69,53 @@ export function UserProfile() {
   const [followingCount, setFollowingCount] = useState(0);
   const [followLoading, setFollowLoading] = useState(false);
   const [streakCount, setStreakCount] = useState(0);
+
+  const [showFollowModal, setShowFollowModal] = useState<false | 'followers' | 'following'>(false);
+  const [followList, setFollowList] = useState<{ username: string; avatar_url: string | null }[]>([]);
+  const [followListLoading, setFollowListLoading] = useState(false);
+
+  const openFollowModal = async (type: 'followers' | 'following') => {
+    if (!profile) return;
+    setShowFollowModal(type);
+    setFollowListLoading(true);
+    setFollowList([]);
+
+    try {
+      if (type === 'followers') {
+        const { data: followRows } = await supabase
+          .from('follows')
+          .select('follower_id')
+          .eq('following_id', profile.id);
+
+        const ids = followRows?.map(r => r.follower_id) || [];
+        if (ids.length > 0) {
+          const { data: profileRows } = await supabase
+            .from('profiles')
+            .select('username, avatar_url')
+            .in('id', ids);
+          setFollowList(profileRows || []);
+        }
+      } else {
+        const { data: followRows } = await supabase
+          .from('follows')
+          .select('following_id')
+          .eq('follower_id', profile.id);
+
+        const ids = followRows?.map(r => r.following_id) || [];
+        if (ids.length > 0) {
+          const { data: profileRows } = await supabase
+            .from('profiles')
+            .select('username, avatar_url')
+            .in('id', ids);
+          setFollowList(profileRows || []);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load follow list details:', err);
+    } finally {
+      setFollowListLoading(false);
+    }
+  };
 
   const isOwnProfile = currentUser && profile && currentUser.id === profile.id;
 
@@ -380,15 +427,23 @@ export function UserProfile() {
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: '1rem', fontSize: '0.85rem' }}>
-                <div>
-                  <span style={{ color: 'white', fontWeight: 800 }}>{followerCount}</span>{' '}
+              <div style={{ display: 'flex', gap: '1.25rem', fontSize: '0.85rem' }}>
+                <button 
+                  onClick={() => openFollowModal('followers')}
+                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'inline-flex', gap: '0.25rem', fontSize: 'inherit', fontFamily: 'inherit', color: 'inherit' }}
+                  className="hover-underline hover-scale"
+                >
+                  <span style={{ color: 'white', fontWeight: 800 }}>{followerCount}</span>
                   <span style={{ color: 'var(--text-secondary)' }}>followers</span>
-                </div>
-                <div>
-                  <span style={{ color: 'white', fontWeight: 800 }}>{followingCount}</span>{' '}
+                </button>
+                <button 
+                  onClick={() => openFollowModal('following')}
+                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'inline-flex', gap: '0.25rem', fontSize: 'inherit', fontFamily: 'inherit', color: 'inherit' }}
+                  className="hover-underline hover-scale"
+                >
+                  <span style={{ color: 'white', fontWeight: 800 }}>{followingCount}</span>
                   <span style={{ color: 'var(--text-secondary)' }}>following</span>
-                </div>
+                </button>
               </div>
             </div>
 
@@ -619,6 +674,157 @@ export function UserProfile() {
           </div>
         )}
       </div>
+
+      {/* Followers / Following Modal */}
+      {showFollowModal && (
+        <div
+          onClick={() => setShowFollowModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem',
+            animation: 'fadeIn 0.2s ease'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="glass"
+            style={{
+              width: '100%',
+              maxWidth: '420px',
+              maxHeight: '70vh',
+              borderRadius: '1.25rem',
+              border: '1px solid var(--border-color)',
+              boxShadow: '0 25px 60px rgba(0,0,0,0.6)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              animation: 'slideUp 0.25s ease'
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '1.25rem 1.5rem',
+              borderBottom: '1px solid var(--border-color)',
+              flexShrink: 0
+            }}>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, textTransform: 'capitalize' }}>
+                {showFollowModal === 'followers' ? `Followers (${followerCount})` : `Following (${followingCount})`}
+              </h3>
+              <button
+                onClick={() => setShowFollowModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  fontSize: '1.5rem',
+                  lineHeight: 1,
+                  padding: '0.25rem',
+                  fontWeight: 700
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: '0.5rem 0'
+            }}>
+              {followListLoading ? (
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem 0' }}>
+                  <Loader2 className="animate-spin" size={32} color="var(--accent-primary)" />
+                </div>
+              ) : followList.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '3rem 1.5rem', color: 'var(--text-secondary)' }}>
+                  <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>
+                    {showFollowModal === 'followers' ? '👥' : '🔍'}
+                  </div>
+                  <p style={{ margin: 0, fontWeight: 600 }}>
+                    {showFollowModal === 'followers'
+                      ? 'No followers yet'
+                      : 'Not following anyone yet'}
+                  </p>
+                </div>
+              ) : (
+                followList.map((person) => (
+                  <Link
+                    key={person.username}
+                    to={`/user/${person.username}`}
+                    onClick={() => setShowFollowModal(false)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.75rem',
+                      padding: '0.75rem 1.5rem',
+                      textDecoration: 'none',
+                      color: 'inherit',
+                      transition: 'background-color 0.15s',
+                    }}
+                    className="hover-bg"
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                  >
+                    {/* Avatar */}
+                    <div style={{
+                      width: '42px',
+                      height: '42px',
+                      borderRadius: '50%',
+                      background: getAvatarColor(person.username),
+                      padding: '2px',
+                      flexShrink: 0
+                    }}>
+                      <div style={{
+                        width: '100%',
+                        height: '100%',
+                        borderRadius: '50%',
+                        backgroundColor: 'var(--bg-color-tertiary)',
+                        overflow: 'hidden',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center'
+                      }}>
+                        {person.avatar_url ? (
+                          <img src={person.avatar_url} alt={person.username} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <span style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-secondary)' }}>
+                            {getInitials(person.username)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Username + Badge */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontWeight: 700, fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {person.username}
+                        </span>
+                        <UserBadge username={person.username} size="sm" />
+                      </div>
+                    </div>
+
+                    {/* Arrow */}
+                    <ChevronRight size={16} color="var(--text-secondary)" style={{ flexShrink: 0 }} />
+                  </Link>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
     </main>
   );

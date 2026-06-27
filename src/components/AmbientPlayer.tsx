@@ -2,7 +2,6 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Music, Play, Pause, SkipForward, SkipBack, Volume2, VolumeX, ChevronDown, Shuffle, Repeat, X } from 'lucide-react';
 
 // ── Track data (CC0 public domain from github.com/btahir/open-lofi) ──
-const BASE = 'https://raw.githubusercontent.com/btahir/open-lofi/main';
 
 interface Track {
   title: string;
@@ -20,58 +19,64 @@ const CATEGORIES = [
   { slug: 'jazz', label: 'Jazz Lounge', emoji: '🎷' },
 ];
 
-function trackUrl(folder: string, title: string) {
-  return `${BASE}/${encodeURIComponent(folder)}/${encodeURIComponent(title)}.mp3`;
+function trackUrl(title: string) {
+  const filename = title
+    .toLowerCase()
+    .replace(/[,\s&]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    + '.mp3';
+  return `/lofi/${filename}`;
 }
 
 const TRACKS: Track[] = [
   // Asian & Zen Lo-Fi
-  { title: 'Bamboo Shadow Waltz', category: 'Zen & Anime', categorySlug: 'asian', url: trackUrl('Asian & Zen Lo-Fi', 'Bamboo Shadow Waltz') },
-  { title: 'Bells Before Sunrise', category: 'Zen & Anime', categorySlug: 'asian', url: trackUrl('Asian & Zen Lo-Fi', 'Bells Before Sunrise') },
-  { title: 'Lanterns in Slow Motion', category: 'Zen & Anime', categorySlug: 'asian', url: trackUrl('Asian & Zen Lo-Fi', 'Lanterns in Slow Motion') },
-  { title: 'Misty Steam Quiet Dreams', category: 'Zen & Anime', categorySlug: 'asian', url: trackUrl('Asian & Zen Lo-Fi', 'Misty Steam Quiet Dreams') },
-  { title: 'Moon Through Bamboo', category: 'Zen & Anime', categorySlug: 'asian', url: trackUrl('Asian & Zen Lo-Fi', 'Moon Through Bamboo') },
-  { title: 'Paper Lantern Rain', category: 'Zen & Anime', categorySlug: 'asian', url: trackUrl('Asian & Zen Lo-Fi', 'Paper Lantern Rain') },
-  { title: 'Teacup Morning Fog', category: 'Zen & Anime', categorySlug: 'asian', url: trackUrl('Asian & Zen Lo-Fi', 'Teacup Morning Fog') },
-  { title: 'Temple at Dawn', category: 'Zen & Anime', categorySlug: 'asian', url: trackUrl('Asian & Zen Lo-Fi', 'Temple at Dawn') },
+  { title: 'Bamboo Shadow Waltz', category: 'Zen & Anime', categorySlug: 'asian', url: trackUrl('Bamboo Shadow Waltz') },
+  { title: 'Bells Before Sunrise', category: 'Zen & Anime', categorySlug: 'asian', url: trackUrl('Bells Before Sunrise') },
+  { title: 'Lanterns in Slow Motion', category: 'Zen & Anime', categorySlug: 'asian', url: trackUrl('Lanterns in Slow Motion') },
+  { title: 'Misty Steam Quiet Dreams', category: 'Zen & Anime', categorySlug: 'asian', url: trackUrl('Misty Steam Quiet Dreams') },
+  { title: 'Moon Through Bamboo', category: 'Zen & Anime', categorySlug: 'asian', url: trackUrl('Moon Through Bamboo') },
+  { title: 'Paper Lantern Rain', category: 'Zen & Anime', categorySlug: 'asian', url: trackUrl('Paper Lantern Rain') },
+  { title: 'Teacup Morning Fog', category: 'Zen & Anime', categorySlug: 'asian', url: trackUrl('Teacup Morning Fog') },
+  { title: 'Temple at Dawn', category: 'Zen & Anime', categorySlug: 'asian', url: trackUrl('Temple at Dawn') },
 
   // Ambient Drift & Dreamscapes
-  { title: 'A Letter Left Open', category: 'Dreamscape', categorySlug: 'ambient', url: trackUrl('Ambient Drift & Dreamscapes', 'A Letter Left Open') },
-  { title: 'Between Two Clouds', category: 'Dreamscape', categorySlug: 'ambient', url: trackUrl('Ambient Drift & Dreamscapes', 'Between Two Clouds') },
-  { title: 'Breathing Room', category: 'Dreamscape', categorySlug: 'ambient', url: trackUrl('Ambient Drift & Dreamscapes', 'Breathing Room') },
-  { title: 'Curtain Sigh', category: 'Dreamscape', categorySlug: 'ambient', url: trackUrl('Ambient Drift & Dreamscapes', 'Curtain Sigh') },
-  { title: 'Drift Between Pages', category: 'Dreamscape', categorySlug: 'ambient', url: trackUrl('Ambient Drift & Dreamscapes', 'Drift Between Pages') },
-  { title: 'Floating Ink', category: 'Dreamscape', categorySlug: 'ambient', url: trackUrl('Ambient Drift & Dreamscapes', 'Floating Ink') },
-  { title: 'Half Remembered Room', category: 'Dreamscape', categorySlug: 'ambient', url: trackUrl('Ambient Drift & Dreamscapes', 'Half Remembered Room') },
-  { title: 'Soft Landing', category: 'Dreamscape', categorySlug: 'ambient', url: trackUrl('Ambient Drift & Dreamscapes', 'Soft Landing') },
+  { title: 'A Letter Left Open', category: 'Dreamscape', categorySlug: 'ambient', url: trackUrl('A Letter Left Open') },
+  { title: 'Between Two Clouds', category: 'Dreamscape', categorySlug: 'ambient', url: trackUrl('Between Two Clouds') },
+  { title: 'Breathing Room', category: 'Dreamscape', categorySlug: 'ambient', url: trackUrl('Breathing Room') },
+  { title: 'Curtain Sigh', category: 'Dreamscape', categorySlug: 'ambient', url: trackUrl('Curtain Sigh') },
+  { title: 'Drift Between Pages', category: 'Dreamscape', categorySlug: 'ambient', url: trackUrl('Drift Between Pages') },
+  { title: 'Floating Ink', category: 'Dreamscape', categorySlug: 'ambient', url: trackUrl('Floating Ink') },
+  { title: 'Half Remembered Room', category: 'Dreamscape', categorySlug: 'ambient', url: trackUrl('Half Remembered Room') },
+  { title: 'Soft Landing', category: 'Dreamscape', categorySlug: 'ambient', url: trackUrl('Soft Landing') },
 
   // Late Night, Neon & After Hours
-  { title: '3 AM in a Taxi', category: 'Late Night', categorySlug: 'late-night', url: trackUrl('Late Night, Neon & After Hours', '3 AM in a Taxi') },
-  { title: 'After the Encore', category: 'Late Night', categorySlug: 'late-night', url: trackUrl('Late Night, Neon & After Hours', 'After the Encore') },
-  { title: 'Alley Glow', category: 'Late Night', categorySlug: 'late-night', url: trackUrl('Late Night, Neon & After Hours', 'Alley Glow') },
-  { title: 'Bar Tab Lullaby', category: 'Late Night', categorySlug: 'late-night', url: trackUrl('Late Night, Neon & After Hours', 'Bar Tab Lullaby') },
-  { title: 'Cigarette on the Fire Escape', category: 'Late Night', categorySlug: 'late-night', url: trackUrl('Late Night, Neon & After Hours', 'Cigarette on the Fire Escape') },
-  { title: 'City Drip', category: 'Late Night', categorySlug: 'late-night', url: trackUrl('Late Night, Neon & After Hours', 'City Drip') },
-  { title: 'Hotel Elevator Music', category: 'Late Night', categorySlug: 'late-night', url: trackUrl('Late Night, Neon & After Hours', 'Hotel Elevator Music') },
-  { title: 'Neon Puddle Walk', category: 'Late Night', categorySlug: 'late-night', url: trackUrl('Late Night, Neon & After Hours', 'Neon Puddle Walk') },
+  { title: '3 AM in a Taxi', category: 'Late Night', categorySlug: 'late-night', url: trackUrl('3 AM in a Taxi') },
+  { title: 'After the Encore', category: 'Late Night', categorySlug: 'late-night', url: trackUrl('After the Encore') },
+  { title: 'Alley Glow', category: 'Late Night', categorySlug: 'late-night', url: trackUrl('Alley Glow') },
+  { title: 'Bar Tab Lullaby', category: 'Late Night', categorySlug: 'late-night', url: trackUrl('Bar Tab Lullaby') },
+  { title: 'Cigarette on the Fire Escape', category: 'Late Night', categorySlug: 'late-night', url: trackUrl('Cigarette on the Fire Escape') },
+  { title: 'City Drip', category: 'Late Night', categorySlug: 'late-night', url: trackUrl('City Drip') },
+  { title: 'Hotel Elevator Music', category: 'Late Night', categorySlug: 'late-night', url: trackUrl('Hotel Elevator Music') },
+  { title: 'Neon Puddle Walk', category: 'Late Night', categorySlug: 'late-night', url: trackUrl('Neon Puddle Walk') },
 
   // Chillhop & Cozy Beats
-  { title: 'Blanket Fort Diplomacy', category: 'Chill Beats', categorySlug: 'chill', url: trackUrl('Chillhop & Cozy Beats', 'Blanket Fort Diplomacy') },
-  { title: 'Cloudy with a Chance of Naps', category: 'Chill Beats', categorySlug: 'chill', url: trackUrl('Chillhop & Cozy Beats', 'Cloudy with a Chance of Naps') },
-  { title: 'Couch Groove Philosophy', category: 'Chill Beats', categorySlug: 'chill', url: trackUrl('Chillhop & Cozy Beats', 'Couch Groove Philosophy') },
-  { title: 'Half Asleep on the Couch', category: 'Chill Beats', categorySlug: 'chill', url: trackUrl('Chillhop & Cozy Beats', 'Half Asleep on the Couch') },
-  { title: 'Hoodie Weather Groove', category: 'Chill Beats', categorySlug: 'chill', url: trackUrl('Chillhop & Cozy Beats', 'Hoodie Weather Groove') },
-  { title: 'Lazy Sunday Protocol', category: 'Chill Beats', categorySlug: 'chill', url: trackUrl('Chillhop & Cozy Beats', 'Lazy Sunday Protocol') },
-  { title: 'Pillow Talk for One', category: 'Chill Beats', categorySlug: 'chill', url: trackUrl('Chillhop & Cozy Beats', 'Pillow Talk for One') },
-  { title: 'Socks on Hardwood', category: 'Chill Beats', categorySlug: 'chill', url: trackUrl('Chillhop & Cozy Beats', 'Socks on Hardwood') },
+  { title: 'Blanket Fort Diplomacy', category: 'Chill Beats', categorySlug: 'chill', url: trackUrl('Blanket Fort Diplomacy') },
+  { title: 'Cloudy with a Chance of Naps', category: 'Chill Beats', categorySlug: 'chill', url: trackUrl('Cloudy with a Chance of Naps') },
+  { title: 'Couch Groove Philosophy', category: 'Chill Beats', categorySlug: 'chill', url: trackUrl('Couch Groove Philosophy') },
+  { title: 'Half Asleep on the Couch', category: 'Chill Beats', categorySlug: 'chill', url: trackUrl('Half Asleep on the Couch') },
+  { title: 'Hoodie Weather Groove', category: 'Chill Beats', categorySlug: 'chill', url: trackUrl('Hoodie Weather Groove') },
+  { title: 'Lazy Sunday Protocol', category: 'Chill Beats', categorySlug: 'chill', url: trackUrl('Lazy Sunday Protocol') },
+  { title: 'Pillow Talk for One', category: 'Chill Beats', categorySlug: 'chill', url: trackUrl('Pillow Talk for One') },
+  { title: 'Socks on Hardwood', category: 'Chill Beats', categorySlug: 'chill', url: trackUrl('Socks on Hardwood') },
 
   // Jazz Lounge & Bookstore Grooves
-  { title: 'A Booth by the Window', category: 'Jazz Lounge', categorySlug: 'jazz', url: trackUrl('Jazz Lounge & Bookstore Grooves', 'A Booth by the Window') },
-  { title: 'Bookstore Dust and Brass', category: 'Jazz Lounge', categorySlug: 'jazz', url: trackUrl('Jazz Lounge & Bookstore Grooves', 'Bookstore Dust and Brass') },
-  { title: 'Cappuccino and a Novel', category: 'Jazz Lounge', categorySlug: 'jazz', url: trackUrl('Jazz Lounge & Bookstore Grooves', 'Cappuccino and a Novel') },
-  { title: 'Corner Booth Serenade', category: 'Jazz Lounge', categorySlug: 'jazz', url: trackUrl('Jazz Lounge & Bookstore Grooves', 'Corner Booth Serenade') },
-  { title: 'Late Set Easy Feeling', category: 'Jazz Lounge', categorySlug: 'jazz', url: trackUrl('Jazz Lounge & Bookstore Grooves', 'Late Set Easy Feeling') },
-  { title: 'Vinyl and Velvet', category: 'Jazz Lounge', categorySlug: 'jazz', url: trackUrl('Jazz Lounge & Bookstore Grooves', 'Vinyl and Velvet') },
+  { title: 'A Booth by the Window', category: 'Jazz Lounge', categorySlug: 'jazz', url: trackUrl('A Booth by the Window') },
+  { title: 'Bookstore Dust and Brass', category: 'Jazz Lounge', categorySlug: 'jazz', url: trackUrl('Bookstore Dust and Brass') },
+  { title: 'Cappuccino and a Novel', category: 'Jazz Lounge', categorySlug: 'jazz', url: trackUrl('Cappuccino and a Novel') },
+  { title: 'Corner Booth Serenade', category: 'Jazz Lounge', categorySlug: 'jazz', url: trackUrl('Corner Booth Serenade') },
+  { title: 'Late Set Easy Feeling', category: 'Jazz Lounge', categorySlug: 'jazz', url: trackUrl('Late Set Easy Feeling') },
+  { title: 'Vinyl and Velvet', category: 'Jazz Lounge', categorySlug: 'jazz', url: trackUrl('Vinyl and Velvet') },
 ];
 
 export function AmbientPlayer() {

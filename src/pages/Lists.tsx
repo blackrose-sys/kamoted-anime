@@ -29,6 +29,7 @@ export function Lists() {
   
   // States
   const [allLists, setAllLists] = useState<AnimeList[]>([]);
+  const [likedListIds, setLikedListIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   
@@ -75,8 +76,102 @@ export function Lists() {
     }
   };
 
+  // Fetch user liked list IDs
+  const fetchUserLikes = async () => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from('list_likes')
+        .select('list_id')
+        .eq('user_id', user.id);
+      if (!error && data) {
+        setLikedListIds(data.map((l: any) => l.list_id));
+      }
+    } catch (err) {
+      console.error('Error fetching user likes:', err);
+    }
+  };
+
+  // Load lists on mount
   useEffect(() => {
     fetchLists();
+  }, []);
+
+  // Sync user likes
+  useEffect(() => {
+    if (user) {
+      fetchUserLikes();
+    } else {
+      setLikedListIds([]);
+    }
+  }, [user]);
+
+  // Real-time subscription for lists changes
+  useEffect(() => {
+    const channel = supabase
+      .channel('public:anime_lists')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'anime_lists',
+        },
+        async (payload) => {
+          const updatedList = payload.new as AnimeList;
+          const { data: itemsData } = await supabase
+            .from('anime_list_items')
+            .select('*')
+            .eq('list_id', updatedList.id)
+            .order('position', { ascending: true });
+          
+          updatedList.items = itemsData || [];
+
+          setAllLists(prev =>
+            prev.map(l => (l.id === updatedList.id ? updatedList : l))
+          );
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'anime_lists',
+        },
+        async (payload) => {
+          const newList = payload.new as AnimeList;
+          const { data: itemsData } = await supabase
+            .from('anime_list_items')
+            .select('*')
+            .eq('list_id', newList.id)
+            .order('position', { ascending: true });
+          
+          newList.items = itemsData || [];
+
+          setAllLists(prev => {
+            if (prev.some(l => l.id === newList.id)) return prev;
+            return [newList, ...prev];
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'anime_lists',
+        },
+        (payload) => {
+          const oldList = payload.old as { id: string };
+          setAllLists(prev => prev.filter(l => l.id !== oldList.id));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // Search anime via Jikan
@@ -176,25 +271,45 @@ export function Lists() {
     }
   };
 
-  // Like list
+  // Like / Unlike list
   const handleLikeList = async (listId: string) => {
+    if (!user) {
+      alert('Please sign in to like playlists!');
+      return;
+    }
+
     try {
-      // Find list
-      const listObj = allLists.find(l => l.id === listId);
-      if (!listObj) return;
+      const isAlreadyLiked = likedListIds.includes(listId);
 
-      const { error } = await supabase
-        .from('anime_lists')
-        .update({ likes: (listObj.likes || 0) + 1 })
-        .eq('id', listId);
+      if (isAlreadyLiked) {
+        // Unlike list (delete from list_likes; trigger handles count)
+        const { error } = await supabase
+          .from('list_likes')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('list_id', listId);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      setAllLists(prev =>
-        prev.map(l => (l.id === listId ? { ...l, likes: (l.likes || 0) + 1 } : l))
-      );
+        setLikedListIds(prev => prev.filter(id => id !== listId));
+        setAllLists(prev =>
+          prev.map(l => (l.id === listId ? { ...l, likes: Math.max(0, (l.likes || 0) - 1) } : l))
+        );
+      } else {
+        // Like list (insert into list_likes; trigger handles count)
+        const { error } = await supabase
+          .from('list_likes')
+          .insert({ user_id: user.id, list_id: listId });
+
+        if (error) throw error;
+
+        setLikedListIds(prev => [...prev, listId]);
+        setAllLists(prev =>
+          prev.map(l => (l.id === listId ? { ...l, likes: (l.likes || 0) + 1 } : l))
+        );
+      }
     } catch (err) {
-      console.error('Error liking list:', err);
+      console.error('Error updating like status:', err);
     }
   };
 
@@ -403,11 +518,24 @@ export function Lists() {
                 
                 <button 
                   onClick={() => handleLikeList(list.id)}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.8rem', borderRadius: '2rem', backgroundColor: 'rgba(236, 72, 153, 0.1)', border: '1px solid rgba(236, 72, 153, 0.2)', color: '#f472b6', fontWeight: 800, fontSize: '0.75rem', cursor: 'pointer', transition: 'all 0.2s' }}
+                  style={{ 
+                    display: 'inline-flex', 
+                    alignItems: 'center', 
+                    gap: '0.5rem', 
+                    padding: '0.4rem 0.8rem', 
+                    borderRadius: '2rem', 
+                    backgroundColor: likedListIds.includes(list.id) ? 'rgba(236, 72, 153, 0.2)' : 'rgba(255, 255, 255, 0.05)', 
+                    border: likedListIds.includes(list.id) ? '1px solid rgba(236, 72, 153, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)', 
+                    color: likedListIds.includes(list.id) ? '#f472b6' : 'rgba(255, 255, 255, 0.7)', 
+                    fontWeight: 800, 
+                    fontSize: '0.75rem', 
+                    cursor: 'pointer', 
+                    transition: 'all 0.2s' 
+                  }}
                   className="hover-scale"
                 >
-                  <Heart size={14} fill="#f472b6" />
-                  <span>LIKE ({list.likes})</span>
+                  <Heart size={14} fill={likedListIds.includes(list.id) ? "#f472b6" : "none"} color="#f472b6" />
+                  <span>{likedListIds.includes(list.id) ? 'LIKED' : 'LIKE'} ({list.likes})</span>
                 </button>
               </div>
 

@@ -280,3 +280,48 @@ DROP POLICY IF EXISTS "Host can update room" ON public.watch_rooms;
 CREATE POLICY "Host can update room" ON public.watch_rooms FOR UPDATE USING (auth.uid() = host_id);
 
 
+-- ===================================================
+-- 9. Custom Playlist Likes (Real-time Secure Likes)
+-- ===================================================
+CREATE TABLE IF NOT EXISTS public.list_likes (
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  list_id UUID REFERENCES public.anime_lists(id) ON DELETE CASCADE NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+  PRIMARY KEY (user_id, list_id)
+);
+
+-- Enable RLS
+ALTER TABLE public.list_likes ENABLE ROW LEVEL SECURITY;
+
+-- Policies for List Likes
+DROP POLICY IF EXISTS "Likes are viewable by everyone" ON public.list_likes;
+CREATE POLICY "Likes are viewable by everyone" ON public.list_likes FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Users can manage own likes" ON public.list_likes;
+CREATE POLICY "Users can manage own likes" ON public.list_likes FOR ALL USING (auth.uid() = user_id);
+
+-- Trigger to automatically update likes count in public.anime_lists
+CREATE OR REPLACE FUNCTION public.handle_list_like()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF (TG_OP = 'INSERT') THEN
+    UPDATE public.anime_lists
+    SET likes = COALESCE(likes, 0) + 1
+    WHERE id = NEW.list_id;
+    RETURN NEW;
+  ELSIF (TG_OP = 'DELETE') THEN
+    UPDATE public.anime_lists
+    SET likes = GREATEST(0, COALESCE(likes, 0) - 1)
+    WHERE id = OLD.list_id;
+    RETURN OLD;
+  END IF;
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_list_like ON public.list_likes;
+CREATE TRIGGER on_list_like
+  AFTER INSERT OR DELETE ON public.list_likes
+  FOR EACH ROW EXECUTE FUNCTION public.handle_list_like();
+
+

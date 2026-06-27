@@ -97,6 +97,8 @@ export function ChatSidebar() {
   const [activeBar, setActiveBar] = useState<string | null>(null);   // message id with emoji bar open
   const [hoverCard, setHoverCard] = useState<HoverCard | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [reactionTooltip, setReactionTooltip] = useState<{ msgId: string; emoji: string; names: string[]; x: number; y: number } | null>(null);
+  const usernameCache = useRef<Map<string, string>>(new Map());
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -111,6 +113,61 @@ export function ChatSidebar() {
   const scrollToBottom = useCallback(() => {
     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 80);
   }, []);
+
+  /* ─── Resolve user IDs to usernames ─── */
+  const resolveUsernames = useCallback(async (uids: string[]): Promise<string[]> => {
+    const results: string[] = [];
+    const toFetch: string[] = [];
+
+    for (const uid of uids) {
+      const cached = usernameCache.current.get(uid);
+      if (cached) {
+        results.push(cached);
+      } else {
+        toFetch.push(uid);
+      }
+    }
+
+    if (toFetch.length > 0) {
+      // Check if any messages have this user_id so we can grab their username directly
+      const msgMap = new Map(messages.map(m => [m.user_id, m.username]));
+      const stillNeed: string[] = [];
+      for (const uid of toFetch) {
+        const fromMsg = msgMap.get(uid);
+        if (fromMsg) {
+          usernameCache.current.set(uid, fromMsg);
+          results.push(fromMsg);
+        } else {
+          stillNeed.push(uid);
+        }
+      }
+
+      if (stillNeed.length > 0) {
+        try {
+          const { data } = await supabase
+            .from('profiles')
+            .select('id, username')
+            .in('id', stillNeed);
+          for (const p of data || []) {
+            usernameCache.current.set(p.id, p.username);
+            results.push(p.username);
+          }
+        } catch { /* ignore */ }
+      }
+    }
+
+    // Preserve original order
+    return uids.map(uid => usernameCache.current.get(uid) || 'Unknown');
+  }, [messages]);
+
+  /* ─── Show reaction tooltip on hover ─── */
+  const showReactionTooltip = useCallback(async (e: React.MouseEvent, msgId: string, emoji: string, uids: string[]) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    // Show loading state immediately
+    setReactionTooltip({ msgId, emoji, names: ['Loading...'], x: rect.left + rect.width / 2, y: rect.top });
+    const names = await resolveUsernames(uids);
+    setReactionTooltip(prev => prev && prev.msgId === msgId && prev.emoji === emoji ? { ...prev, names } : prev);
+  }, [resolveUsernames]);
 
   /* ─── Initial Load + Realtime ─── */
   useEffect(() => {
@@ -532,7 +589,8 @@ export function ChatSidebar() {
                             <button
                               key={emoji}
                               onClick={() => handleReact(msg, emoji)}
-                              title={`${uids.length} reaction${uids.length > 1 ? 's' : ''}`}
+                              onMouseEnter={(e) => showReactionTooltip(e, msg.id, emoji, uids)}
+                              onMouseLeave={() => setReactionTooltip(null)}
                               style={{
                                 display: 'flex', alignItems: 'center', gap: '0.25rem',
                                 padding: '0.2rem 0.5rem',
@@ -543,7 +601,8 @@ export function ChatSidebar() {
                                 fontSize: '0.78rem', fontWeight: 800,
                                 color: iReacted ? 'var(--accent-primary)' : 'rgba(255,255,255,0.75)',
                                 transition: 'all 0.15s',
-                                lineHeight: 1
+                                lineHeight: 1,
+                                position: 'relative'
                               }}
                               onMouseOver={e => (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.06)'}
                               onMouseOut={e => (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'}
@@ -687,6 +746,73 @@ export function ChatSidebar() {
           <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.2)', textAlign: 'center' }}>
             See their anime list, level &amp; badges
           </div>
+        </div>
+      )}
+
+      {/* Reaction Tooltip — shows who reacted */}
+      {reactionTooltip && (
+        <div
+          className="fade-in"
+          style={{
+            position: 'fixed',
+            left: Math.min(Math.max(8, reactionTooltip.x - 90), window.innerWidth - 200),
+            top: Math.max(8, reactionTooltip.y - 12),
+            transform: 'translateY(-100%)',
+            minWidth: 140,
+            maxWidth: 200,
+            backgroundColor: 'rgba(8, 8, 20, 0.98)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '0.75rem',
+            padding: '0.6rem 0.85rem',
+            zIndex: 400,
+            boxShadow: '0 16px 48px rgba(0, 0, 0, 0.8)',
+            backdropFilter: 'blur(16px)',
+            pointerEvents: 'none',
+          }}
+        >
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            marginBottom: '0.4rem',
+            paddingBottom: '0.35rem',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.07)',
+          }}>
+            <span style={{ fontSize: '1.1rem' }}>{reactionTooltip.emoji}</span>
+            <span style={{
+              fontSize: '0.7rem',
+              fontWeight: 900,
+              color: 'var(--accent-primary)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+            }}>
+              {reactionTooltip.names.length === 1 && reactionTooltip.names[0] === 'Loading...'
+                ? 'Loading...'
+                : `${reactionTooltip.names.length} ${reactionTooltip.names.length === 1 ? 'reaction' : 'reactions'}`
+              }
+            </span>
+          </div>
+          {!(reactionTooltip.names.length === 1 && reactionTooltip.names[0] === 'Loading...') && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+              {reactionTooltip.names.map((name, i) => (
+                <div
+                  key={i}
+                  style={{
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    color: user && usernameCache.current.get(user.id) === name || (messages.find(m => m.username === name)?.user_id === user?.id)
+                      ? 'var(--accent-primary)'
+                      : 'rgba(255, 255, 255, 0.85)',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
+                  {name}{user && messages.find(m => m.username === name)?.user_id === user.id ? ' (you)' : ''}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

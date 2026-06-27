@@ -3,6 +3,7 @@ import { MessageSquare, Send, Trash2, Loader2, LogIn, Clock, MessageCircle } fro
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { UserBadge } from './UserBadge';
 
 interface Comment {
   id: string;
@@ -700,6 +701,7 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
                         </span>
                       )}
                     </Link>
+                    <UserBadge username={comment.username} size="sm" />
                     <span style={{
                       display: 'inline-flex',
                       alignItems: 'center',

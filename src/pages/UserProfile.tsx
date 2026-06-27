@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { AnimeCard } from '../components/AnimeCard';
+import { UserBadge } from '../components/UserBadge';
 import { Loader2, Bookmark, Calendar, Lock, Globe, ChevronLeft, UserPlus, UserCheck, Flame } from 'lucide-react';
 
 interface ProfileData {
@@ -316,6 +317,7 @@ export function UserProfile() {
           <div style={{ flex: 1, minWidth: '250px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
               <h1 style={{ fontSize: '2.25rem', fontWeight: 900, letterSpacing: '-0.02em', margin: 0 }}>{profile.username}</h1>
+              <UserBadge username={profile.username} size="lg" />
               {isOwnProfile && (
                 <Link 
                   to="/profile" 

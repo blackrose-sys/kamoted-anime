@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { Users, Play, Pause, Copy, Check, ArrowLeft, Crown, Loader2, Wifi, Server, ChevronDown, RefreshCw } from 'lucide-react';
 import { animeServers, getServerUrl, fetchAniListMetadata, getAnimeDetails } from '../lib/animeServers';
+import { UserBadge } from '../components/UserBadge';
 
 interface RoomMember {
   user_id: string;
@@ -496,7 +497,10 @@ export function WatchRoom() {
                       {m.avatar_url ? <img src={m.avatar_url} alt={m.username} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : getInitial(m.username)}
                     </div>
                   </div>
-                  <span style={{ fontSize: '0.8rem', fontWeight: 700, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.username}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.username}</span>
+                    <UserBadge username={m.username} size="sm" />
+                  </div>
                   {room?.host_id === m.user_id && (
                     <span title="Host" style={{ display: 'inline-flex' }}>
                       <Crown size={12} color="var(--accent-primary)" />
@@ -521,8 +525,11 @@ export function WatchRoom() {
               )}
               {chatMessages.map((cm, i) => (
                 <div key={i} style={{ fontSize: '0.8rem' }}>
-                  <span style={{ fontWeight: 800, color: cm.user === user?.username ? 'var(--accent-primary)' : '#a78bfa' }}>{cm.user}</span>
-                  <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.65rem', marginLeft: '0.35rem' }}>{cm.time}</span>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', verticalAlign: 'middle', flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 800, color: cm.user === user?.username ? 'var(--accent-primary)' : '#a78bfa' }}>{cm.user}</span>
+                    <UserBadge username={cm.user} size="sm" />
+                  </div>
+                  <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.65rem', marginLeft: '0.35rem', verticalAlign: 'middle' }}>{cm.time}</span>
                   <div style={{ color: 'rgba(255,255,255,0.8)', marginTop: '0.1rem', lineHeight: 1.4 }}>{cm.msg}</div>
                 </div>
               ))}

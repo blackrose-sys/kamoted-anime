@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { MessageCircle, X, Send, Loader2, ChevronDown, Trash2, ExternalLink, Users } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { UserBadge } from './UserBadge';
 
 // reactions shape: { "👍": ["uid1","uid2"], "❤️": ["uid3"] }
 type Reactions = Record<string, string[]>;
@@ -432,6 +433,7 @@ export function ChatSidebar() {
                             >
                               {isMe ? 'You' : msg.username}
                             </button>
+                            <UserBadge username={msg.username} size="sm" />
                             <span style={{ fontSize: '0.59rem', color: 'rgba(255,255,255,0.22)', fontWeight: 600 }}>
                               {timeAgo(msg.created_at)}
                             </span>
@@ -660,7 +662,10 @@ export function ChatSidebar() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <UserAvatar username={hoverCard.username} avatarUrl={hoverCard.avatarUrl} size={44} />
             <div>
-              <div style={{ fontWeight: 900, fontSize: '0.9rem' }}>{hoverCard.username}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: 900, fontSize: '0.9rem' }}>{hoverCard.username}</span>
+                <UserBadge username={hoverCard.username} size="sm" />
+              </div>
               <div style={{ fontSize: '0.67rem', color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>@{hoverCard.username}</div>
             </div>
           </div>

@@ -2,6 +2,7 @@ import { Tv, Search, Check, LogOut, User as UserIcon, Calendar, Newspaper, List 
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { UserBadge } from './UserBadge';
 
 // Discord SVG icon (official shape)
 function DiscordIcon({ size = 16 }: { size?: number }) {
@@ -173,7 +174,10 @@ export function Navbar() {
                 }}>
                   <div style={{ padding: '0.5rem 0.65rem', fontSize: '0.72rem', color: 'rgba(255,255,255,0.35)', borderBottom: '1px solid rgba(255,255,255,0.07)', marginBottom: '0.25rem' }}>
                     Signed in as<br />
-                    <strong style={{ color: '#fff', fontSize: '0.85rem' }}>{user.username}</strong>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.2rem', flexWrap: 'wrap' }}>
+                      <strong style={{ color: '#fff', fontSize: '0.85rem' }}>{user.username}</strong>
+                      <UserBadge username={user.username} size="sm" />
+                    </div>
                   </div>
                   <Link
                     to="/profile"

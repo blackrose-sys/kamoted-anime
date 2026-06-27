@@ -4,6 +4,7 @@ import { Navigate, Link } from 'react-router-dom';
 import { Loader2, Bookmark, Clock, Trash2, Play, Camera, X, Check, Save, User, Mail, ZoomIn, ZoomOut, Globe, Lock, List } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { getAnimeDetails } from '../lib/animeServers';
+import { UserBadge } from '../components/UserBadge';
 
 export function Profile() {
   const { user, updateUser, isLoading } = useAuth();
@@ -496,7 +497,10 @@ export function Profile() {
         {/* TAB 1: SETTINGS */}
         {activeTab === 'settings' && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2.5rem' }}>
-            <h1 style={{ fontSize: '2.5rem', fontWeight: 900, textAlign: 'center', letterSpacing: '-0.02em' }}>My Profile</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+              <h1 style={{ fontSize: '2.5rem', fontWeight: 900, textAlign: 'center', letterSpacing: '-0.02em', margin: 0 }}>My Profile</h1>
+              <UserBadge username={user.username} size="lg" />
+            </div>
             
             {/* Avatar Section */}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem' }}>

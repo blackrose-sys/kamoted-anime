@@ -94,6 +94,8 @@ export function ChatSidebar() {
   const [loading, setLoading] = useState(false);
   const [hasNew, setHasNew] = useState(false);
   const [onlineCount, setOnlineCount] = useState(1);
+  const [onlineUsers, setOnlineUsers] = useState<{ uid: string; username: string; avatar_url: string | null }[]>([]);
+  const [showOnlineList, setShowOnlineList] = useState(false);
   const [activeBar, setActiveBar] = useState<string | null>(null);   // message id with emoji bar open
   const [hoverCard, setHoverCard] = useState<HoverCard | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -206,11 +208,34 @@ export function ChatSidebar() {
     const presenceChannel = supabase.channel('chat-presence-v3');
     presenceChannel
       .on('presence', { event: 'sync' }, () => {
-        setOnlineCount(Math.max(1, Object.keys(presenceChannel.presenceState()).length));
+        const state = presenceChannel.presenceState();
+        const usersList: { uid: string; username: string; avatar_url: string | null }[] = [];
+        
+        Object.keys(state).forEach((key) => {
+          const presenceList = state[key] as any[];
+          presenceList.forEach((presence) => {
+            if (presence.uid) {
+              if (!usersList.some(u => u.uid === presence.uid)) {
+                usersList.push({
+                  uid: presence.uid,
+                  username: presence.username || 'Anonymous Otaku',
+                  avatar_url: presence.avatar_url || null
+                });
+              }
+            }
+          });
+        });
+        
+        setOnlineUsers(usersList);
+        setOnlineCount(Math.max(1, usersList.length));
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
-          await presenceChannel.track({ uid: user?.id ?? `anon-${Math.random()}` });
+          await presenceChannel.track({ 
+            uid: user?.id ?? `anon-${Math.random()}`,
+            username: user?.username ?? 'Anonymous Otaku',
+            avatar_url: user?.avatar_url || null
+          });
         }
       });
 
@@ -397,23 +422,103 @@ export function ChatSidebar() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
               <div style={{ position: 'relative' }}>
                 <MessageCircle size={18} color="var(--accent-primary)" />
-                <span style={{
-                  position: 'absolute', top: -1, right: -3, width: 8, height: 8,
-                  borderRadius: '50%', backgroundColor: '#22c55e',
-                  border: '1.5px solid rgba(8,8,14,0.97)',
-                  boxShadow: '0 0 6px rgba(34,197,94,0.7)'
-                }} />
+                {user?.username === 'fckitscott' && (
+                  <span style={{
+                    position: 'absolute', top: -1, right: -3, width: 8, height: 8,
+                    borderRadius: '50%', backgroundColor: '#22c55e',
+                    border: '1.5px solid rgba(8,8,14,0.97)',
+                    boxShadow: '0 0 6px rgba(34,197,94,0.7)'
+                  }} />
+                )}
               </div>
               <span style={{ fontWeight: 900, fontSize: '0.93rem' }}>Community Chat</span>
-              <span style={{
-                display: 'flex', alignItems: 'center', gap: '0.3rem',
-                fontSize: '0.67rem', fontWeight: 800, color: '#22c55e',
-                backgroundColor: 'rgba(34,197,94,0.08)',
-                border: '1px solid rgba(34,197,94,0.18)',
-                padding: '0.15rem 0.5rem', borderRadius: 9999
-              }}>
-                <Users size={10} />{onlineCount} online
-              </span>
+              
+              {user?.username === 'fckitscott' && (
+                <div style={{ position: 'relative' }}>
+                  <button
+                    onClick={() => setShowOnlineList(!showOnlineList)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '0.3rem',
+                      fontSize: '0.67rem', fontWeight: 800, color: '#22c55e',
+                      backgroundColor: 'rgba(34,197,94,0.08)',
+                      border: '1px solid rgba(34,197,94,0.18)',
+                      padding: '0.15rem 0.5rem', borderRadius: 9999,
+                      cursor: 'pointer', outline: 'none', transition: 'all 0.2s'
+                    }}
+                    className="hover-scale"
+                  >
+                    <Users size={10} />{onlineCount} online
+                  </button>
+
+                  {showOnlineList && (
+                    <div
+                      className="glass fade-in"
+                      style={{
+                        position: 'absolute',
+                        top: '130%',
+                        left: 0,
+                        width: '180px',
+                        backgroundColor: 'rgba(10,10,18,0.98)',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: '0.75rem',
+                        boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+                        zIndex: 210,
+                        padding: '0.5rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.4rem',
+                        maxHeight: '200px',
+                        overflowY: 'auto'
+                      }}
+                    >
+                      <div style={{ fontSize: '0.65rem', fontWeight: 900, color: 'var(--text-secondary)', textTransform: 'uppercase', padding: '0.2rem 0.4rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        Online Users ({onlineUsers.length})
+                      </div>
+                      {onlineUsers.length === 0 ? (
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', padding: '0.4rem', textAlign: 'center' }}>
+                          No users online
+                        </div>
+                      ) : (
+                        onlineUsers.map((u) => (
+                          <Link
+                            key={u.uid}
+                            to={`/user/${u.username}`}
+                            onClick={() => setShowOnlineList(false)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.4rem',
+                              textDecoration: 'none',
+                              color: 'white',
+                              padding: '0.25rem 0.4rem',
+                              borderRadius: '0.4rem',
+                              transition: 'background 0.15s'
+                            }}
+                            onMouseOver={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'}
+                            onMouseOut={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                          >
+                            <div style={{
+                              width: '18px', height: '18px', borderRadius: '50%',
+                              background: 'linear-gradient(135deg, var(--accent-primary), #8b5cf6)',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: '0.5rem', fontWeight: 900, overflow: 'hidden', flexShrink: 0
+                            }}>
+                              {u.avatar_url ? (
+                                <img src={u.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              ) : (
+                                u.username.charAt(0).toUpperCase()
+                              )}
+                            </div>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {u.username}
+                            </span>
+                          </Link>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <button
               onClick={() => setIsOpen(false)}

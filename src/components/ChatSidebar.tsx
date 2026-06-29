@@ -233,7 +233,7 @@ export function ChatSidebar() {
         if (status === 'SUBSCRIBED') {
           await presenceChannel.track({ 
             uid: user?.id ?? `anon-${Math.random()}`,
-            username: user?.username ?? 'Anonymous Otaku',
+            username: user?.username ?? ((import.meta.env as any).VITE_COMPUTER_NAME || 'Anonymous Otaku'),
             avatar_url: user?.avatar_url || null
           });
         }

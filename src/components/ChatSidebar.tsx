@@ -108,7 +108,80 @@ export function ChatSidebar() {
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isOpenRef = useRef(false);
 
+  // Typing indicators
+  const [typingUsers, setTypingUsers] = useState<Record<string, { username: string; timestamp: number }>>({});
+  const [isMeTyping, setIsMeTyping] = useState(false);
+  const channelRef = useRef<any>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const MAX_CHARS = 500;
+
+  const broadcastTyping = useCallback((typingState: boolean) => {
+    if (!user || !channelRef.current) return;
+    channelRef.current.send({
+      type: 'broadcast',
+      event: 'typing',
+      payload: {
+        uid: user.id,
+        username: user.username,
+        isTyping: typingState
+      }
+    });
+  }, [user]);
+
+  const handleInputChange = (val: string) => {
+    setInput(val);
+    if (!user) return;
+
+    if (!isMeTyping && val.trim().length > 0) {
+      setIsMeTyping(true);
+      broadcastTyping(true);
+    }
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    if (val.trim().length === 0) {
+      setIsMeTyping(false);
+      broadcastTyping(false);
+      return;
+    }
+
+    typingTimeoutRef.current = setTimeout(() => {
+      setIsMeTyping(false);
+      broadcastTyping(false);
+    }, 3000);
+  };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setTypingUsers(prev => {
+        let changed = false;
+        const updated = { ...prev };
+        Object.keys(updated).forEach(uid => {
+          if (now - updated[uid].timestamp > 4000) {
+            delete updated[uid];
+            changed = true;
+          }
+        });
+        return changed ? updated : prev;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setTypingUsers({});
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      if (isMeTyping) {
+        setIsMeTyping(false);
+        broadcastTyping(false);
+      }
+    }
+  }, [isOpen, isMeTyping, broadcastTyping]);
 
   useEffect(() => { isOpenRef.current = isOpen; }, [isOpen]);
 
@@ -202,7 +275,22 @@ export function ChatSidebar() {
         const id = (p.old as { id: string }).id;
         setMessages(prev => prev.filter(m => m.id !== id));
       })
+      .on('broadcast', { event: 'typing' }, ({ payload }) => {
+        const { uid, username, isTyping } = payload || {};
+        if (!uid || uid === user?.id) return;
+        setTypingUsers(prev => {
+          const copy = { ...prev };
+          if (isTyping) {
+            copy[uid] = { username, timestamp: Date.now() };
+          } else {
+            delete copy[uid];
+          }
+          return copy;
+        });
+      })
       .subscribe();
+
+    channelRef.current = channel;
 
     // Presence
     const presenceChannel = supabase.channel('chat-presence-v3');
@@ -242,6 +330,7 @@ export function ChatSidebar() {
     return () => {
       supabase.removeChannel(channel);
       supabase.removeChannel(presenceChannel);
+      channelRef.current = null;
     };
   }, [user]);
 
@@ -264,6 +353,11 @@ export function ChatSidebar() {
     if (!text || text.length > MAX_CHARS || sending) return;
     setSending(true);
     setInput('');
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    setIsMeTyping(false);
+    broadcastTyping(false);
     // Optimistic
     const opt: ChatMessage = {
       id: `opt-${Date.now()}`, user_id: user.id, username: user.username,
@@ -723,6 +817,28 @@ export function ChatSidebar() {
                 );
               })
             )}
+            {Object.values(typingUsers).length > 0 && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                padding: '0.35rem 0.55rem',
+                fontSize: '0.76rem',
+                color: 'rgba(255, 255, 255, 0.45)',
+                fontStyle: 'italic',
+                animation: 'chatFadeIn 0.2s ease-out'
+              }}>
+                <div style={{ display: 'flex', gap: '2px', alignItems: 'center', marginRight: '2px' }}>
+                  <span className="typing-dot" style={{ width: '4px', height: '4px', backgroundColor: 'var(--accent-primary)', borderRadius: '50%', animation: 'typingBounce 1.4s infinite ease-in-out', animationDelay: '0s' }} />
+                  <span className="typing-dot" style={{ width: '4px', height: '4px', backgroundColor: 'var(--accent-primary)', borderRadius: '50%', animation: 'typingBounce 1.4s infinite ease-in-out', animationDelay: '0.2s' }} />
+                  <span className="typing-dot" style={{ width: '4px', height: '4px', backgroundColor: 'var(--accent-primary)', borderRadius: '50%', animation: 'typingBounce 1.4s infinite ease-in-out', animationDelay: '0.4s' }} />
+                </div>
+                <span>
+                  {Object.values(typingUsers).map(u => u.username).join(', ')}{' '}
+                  {Object.values(typingUsers).length === 1 ? 'is typing...' : 'are typing...'}
+                </span>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
 
@@ -742,7 +858,7 @@ export function ChatSidebar() {
                     type="text"
                     placeholder="Message the community..."
                     value={input}
-                    onChange={e => setInput(e.target.value)}
+                    onChange={e => handleInputChange(e.target.value)}
                     onKeyDown={handleKey}
                     maxLength={MAX_CHARS}
                     style={{
@@ -926,6 +1042,14 @@ export function ChatSidebar() {
           0%   { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); }
           70%  { box-shadow: 0 0 0 8px rgba(239,68,68,0); }
           100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+        }
+        @keyframes typingBounce {
+          0%, 80%, 100% { transform: translateY(0); }
+          40% { transform: translateY(-4px); }
+        }
+        @keyframes chatFadeIn {
+          from { opacity: 0; transform: translateY(4px); }
+          to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
     </>

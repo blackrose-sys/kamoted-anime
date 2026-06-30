@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { Users, Play, Pause, Copy, Check, ArrowLeft, Crown, Loader2, Wifi, Server, ChevronDown, RefreshCw } from 'lucide-react';
+import { Users, Play, Pause, Copy, Check, ArrowLeft, Crown, Loader2, Wifi, Server, ChevronDown, RefreshCw, Monitor, Smartphone } from 'lucide-react';
 import { animeServers, getServerUrl, fetchAniListMetadata, getAnimeDetails } from '../lib/animeServers';
 import { UserBadge } from '../components/UserBadge';
 
@@ -11,6 +11,7 @@ interface RoomMember {
   username: string;
   avatar_url: string | null;
   joined_at: string;
+  device?: string;
 }
 
 interface WatchRoom {
@@ -118,11 +119,13 @@ export function WatchRoom() {
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED' && user) {
+          const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
           await presenceChannel.track({
             user_id: user.id,
             username: user.username,
             avatar_url: user.avatar_url,
-            joined_at: new Date().toISOString()
+            joined_at: new Date().toISOString(),
+            device: isMobile ? 'mobile' : 'desktop'
           });
         }
       });
@@ -500,6 +503,16 @@ export function WatchRoom() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flex: 1, minWidth: 0 }}>
                     <span style={{ fontSize: '0.8rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.username}</span>
                     <UserBadge username={m.username} size="sm" />
+                    <div 
+                      title={m.device === 'mobile' ? 'Mobile' : 'Desktop / PC'} 
+                      style={{ display: 'flex', alignItems: 'center', color: 'rgba(255,255,255,0.35)', marginLeft: '2px', flexShrink: 0 }}
+                    >
+                      {m.device === 'mobile' ? (
+                        <Smartphone size={10} style={{ color: '#a78bfa' }} />
+                      ) : (
+                        <Monitor size={10} style={{ color: '#f59e0b' }} />
+                      )}
+                    </div>
                   </div>
                   {room?.host_id === m.user_id && (
                     <span title="Host" style={{ display: 'inline-flex' }}>

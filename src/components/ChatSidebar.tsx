@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { MessageCircle, X, Send, Loader2, ChevronDown, Trash2, ExternalLink, Users } from 'lucide-react';
+import { MessageCircle, X, Send, Loader2, ChevronDown, Trash2, ExternalLink, Users, Monitor, Smartphone } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { UserBadge } from './UserBadge';
@@ -94,7 +94,7 @@ export function ChatSidebar() {
   const [loading, setLoading] = useState(false);
   const [hasNew, setHasNew] = useState(false);
   const [onlineCount, setOnlineCount] = useState(1);
-  const [onlineUsers, setOnlineUsers] = useState<{ uid: string; username: string; avatar_url: string | null }[]>([]);
+  const [onlineUsers, setOnlineUsers] = useState<{ uid: string; username: string; avatar_url: string | null; device?: string }[]>([]);
   const [showOnlineList, setShowOnlineList] = useState(false);
   const [activeBar, setActiveBar] = useState<string | null>(null);   // message id with emoji bar open
   const [hoverCard, setHoverCard] = useState<HoverCard | null>(null);
@@ -297,7 +297,7 @@ export function ChatSidebar() {
     presenceChannel
       .on('presence', { event: 'sync' }, () => {
         const state = presenceChannel.presenceState();
-        const usersList: { uid: string; username: string; avatar_url: string | null }[] = [];
+        const usersList: { uid: string; username: string; avatar_url: string | null; device?: string }[] = [];
         
         Object.keys(state).forEach((key) => {
           const presenceList = state[key] as any[];
@@ -307,7 +307,8 @@ export function ChatSidebar() {
                 usersList.push({
                   uid: presence.uid,
                   username: presence.username || 'Anonymous Otaku',
-                  avatar_url: presence.avatar_url || null
+                  avatar_url: presence.avatar_url || null,
+                  device: presence.device || 'desktop'
                 });
               }
             }
@@ -319,10 +320,12 @@ export function ChatSidebar() {
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
+          const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
           await presenceChannel.track({ 
             uid: user?.id ?? `anon-${Math.random()}`,
             username: user?.username ?? ((import.meta.env as any).VITE_COMPUTER_NAME || 'Anonymous Otaku'),
-            avatar_url: user?.avatar_url || null
+            avatar_url: user?.avatar_url || null,
+            device: isMobile ? 'mobile' : 'desktop'
           });
         }
       });
@@ -581,6 +584,7 @@ export function ChatSidebar() {
                             style={{
                               display: 'flex',
                               alignItems: 'center',
+                              justifyContent: 'space-between',
                               gap: '0.4rem',
                               textDecoration: 'none',
                               color: 'white',
@@ -591,21 +595,33 @@ export function ChatSidebar() {
                             onMouseOver={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'}
                             onMouseOut={e => e.currentTarget.style.backgroundColor = 'transparent'}
                           >
-                            <div style={{
-                              width: '18px', height: '18px', borderRadius: '50%',
-                              background: 'linear-gradient(135deg, var(--accent-primary), #8b5cf6)',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              fontSize: '0.5rem', fontWeight: 900, overflow: 'hidden', flexShrink: 0
-                            }}>
-                              {u.avatar_url ? (
-                                <img src={u.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0, flex: 1 }}>
+                              <div style={{
+                                width: '18px', height: '18px', borderRadius: '50%',
+                                background: 'linear-gradient(135deg, var(--accent-primary), #8b5cf6)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: '0.5rem', fontWeight: 900, overflow: 'hidden', flexShrink: 0
+                              }}>
+                                {u.avatar_url ? (
+                                  <img src={u.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                ) : (
+                                  u.username.charAt(0).toUpperCase()
+                                )}
+                              </div>
+                              <span style={{ fontSize: '0.75rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {u.username}
+                              </span>
+                            </div>
+                            <div 
+                              title={u.device === 'mobile' ? 'Mobile' : 'Desktop / PC'} 
+                              style={{ display: 'flex', alignItems: 'center', color: 'rgba(255,255,255,0.35)', marginLeft: '4px', flexShrink: 0 }}
+                            >
+                              {u.device === 'mobile' ? (
+                                <Smartphone size={11} style={{ color: '#a78bfa' }} />
                               ) : (
-                                u.username.charAt(0).toUpperCase()
+                                <Monitor size={11} style={{ color: '#f59e0b' }} />
                               )}
                             </div>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {u.username}
-                            </span>
                           </Link>
                         ))
                       )}

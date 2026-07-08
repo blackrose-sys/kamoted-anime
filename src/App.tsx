@@ -13,6 +13,7 @@ import { Calendar } from './pages/Calendar';
 import { News } from './pages/News';
 import { WatchRoom } from './pages/WatchRoom';
 import { Lists } from './pages/Lists';
+import { Contact } from './pages/Contact';
 import { AmbientPlayer } from './components/AmbientPlayer';
 import { AuthProvider } from './context/AuthContext';
 
@@ -35,6 +36,7 @@ function App() {
             <Route path="/news" element={<News />} />
             <Route path="/lists" element={<Lists />} />
             <Route path="/room/:roomId" element={<WatchRoom />} />
+            <Route path="/contact" element={<Contact />} />
           </Routes>
           <Footer />
           <AmbientPlayer />

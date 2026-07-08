@@ -325,3 +325,62 @@ CREATE TRIGGER on_list_like
   FOR EACH ROW EXECUTE FUNCTION public.handle_list_like();
 
 
+-- ===================================================
+-- 9. Contact Messages Table
+-- ===================================================
+CREATE TABLE IF NOT EXISTS contact_messages (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users(id) on delete set null,
+  sender_name text not null,
+  sender_email text not null,
+  sender_username text not null,
+  subject text default '',
+  message text not null,
+  is_read boolean default false,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+ALTER TABLE contact_messages ENABLE ROW LEVEL SECURITY;
+
+-- Anyone can insert (send a message)
+CREATE POLICY "Anyone can send a contact message"
+  ON contact_messages FOR INSERT
+  WITH CHECK (true);
+
+-- Only the developer (fckitscott) can read all messages
+-- We check by joining to profiles to find the dev user
+CREATE POLICY "Dev can read all contact messages"
+  ON contact_messages FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE profiles.id = auth.uid()
+      AND profiles.username = 'fckitscott'
+    )
+  );
+
+-- Only the developer can update (mark as read)
+CREATE POLICY "Dev can update contact messages"
+  ON contact_messages FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE profiles.id = auth.uid()
+      AND profiles.username = 'fckitscott'
+    )
+  );
+
+-- Only the developer can delete messages
+CREATE POLICY "Dev can delete contact messages"
+  ON contact_messages FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE profiles.id = auth.uid()
+      AND profiles.username = 'fckitscott'
+    )
+  );
+
+-- Enable Realtime for contact_messages
+ALTER PUBLICATION supabase_realtime ADD TABLE contact_messages;
+

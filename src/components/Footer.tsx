@@ -1,4 +1,4 @@
-import { Terminal, Tv } from 'lucide-react';
+import { Terminal, Tv, Mail } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export function Footer() {
@@ -20,6 +20,18 @@ export function Footer() {
               <Link to="/browse" className="hover:text-accent-primary transition-colors">Browse Library</Link>
               <Link to="/calendar" className="hover:text-accent-primary transition-colors">Ongoing Releases</Link>
               <Link to="/browse?tab=season" className="hover:text-accent-primary transition-colors">Seasonal Archive</Link>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <h3 className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+              <Mail size={14} color="#8b5cf6" />
+              Connect
+            </h3>
+            <div className="flex flex-col gap-2 text-xs font-medium text-zinc-400">
+              <Link to="/contact" className="hover:text-accent-primary transition-colors">Get in Touch</Link>
+              <Link to="/news" className="hover:text-accent-primary transition-colors">Anime News</Link>
+              <Link to="/lists" className="hover:text-accent-primary transition-colors">Community Playlists</Link>
             </div>
           </div>
         </div>

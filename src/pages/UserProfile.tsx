@@ -130,7 +130,7 @@ export function UserProfile() {
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*')
-          .eq('username', username)
+          .ilike('username', username)
           .maybeSingle();
 
         if (profileError) throw profileError;

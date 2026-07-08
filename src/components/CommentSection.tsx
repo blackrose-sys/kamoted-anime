@@ -249,7 +249,11 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
 
         const { error: uploadError } = await supabase.storage
           .from('chat-media')
-          .upload(filePath, mediaFile);
+          .upload(filePath, mediaFile, {
+            contentType: mediaFile.type,
+            cacheControl: '3600',
+            upsert: false
+          });
 
         if (uploadError) throw uploadError;
 

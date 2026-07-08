@@ -427,7 +427,7 @@ ON storage.objects FOR SELECT
 USING (bucket_id = 'chat-media');
 
 DROP POLICY IF EXISTS "Authenticated users can upload media" ON storage.objects;
-CREATE POLICY "Authenticated users can upload media" 
+DROP POLICY IF EXISTS "Anyone can upload media" ON storage.objects;
+CREATE POLICY "Anyone can upload media" 
 ON storage.objects FOR INSERT 
-TO authenticated
 WITH CHECK (bucket_id = 'chat-media');

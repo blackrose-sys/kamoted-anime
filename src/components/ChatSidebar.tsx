@@ -413,7 +413,11 @@ export function ChatSidebar() {
 
         const { error: uploadError } = await supabase.storage
           .from('chat-media')
-          .upload(filePath, mediaFile);
+          .upload(filePath, mediaFile, {
+            contentType: mediaFile.type,
+            cacheControl: '3600',
+            upsert: false
+          });
 
         if (uploadError) throw uploadError;
 

@@ -38,7 +38,17 @@ jobs:
         run: chmod +x android/gradlew
 
       - name: Sync Capacitor Android
-        run: npx cap sync android --verbose
+        run: |
+          npx cap sync android --verbose > sync_log.txt 2>&1 || true
+          cat sync_log.txt
+          echo "### Capacitor Sync Log" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          cat sync_log.txt >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          if grep -q "failed" sync_log.txt || grep -q "error" sync_log.txt || [ ! -f "android/app/src/main/assets/capacitor.config.json" ]; then
+            echo "Capacitor Sync Failed"
+            exit 1
+          fi
 
       - name: Build Android App (Debug APK)
         run: |

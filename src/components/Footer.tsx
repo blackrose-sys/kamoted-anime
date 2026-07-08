@@ -5,7 +5,7 @@ export function Footer() {
   return (
     <footer style={{ marginTop: 'auto', borderTop: '1px solid var(--border-color)', backgroundColor: '#050505', padding: '3rem 0' }}>
       <div className="container">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+        <div className="footer-grid flex flex-col md:flex-row justify-between items-center gap-6">
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', textDecoration: 'none', color: 'inherit' }} className="hover-scale">
             <Tv color="var(--accent-primary)" size={28} className="logo-icon" />
             <span className="animated-logo">kamoted</span>

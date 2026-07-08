@@ -408,10 +408,10 @@ export function Home() {
     <main style={{ flex: 1, paddingBottom: '4rem' }}>
       <Hero featured={latestAnime.slice(0, 5)} />
       
-      <div className="container" style={{ padding: '4rem 1.5rem', display: 'flex', flexDirection: 'row', gap: '2rem', flexWrap: 'wrap' }}>
+      <div className="container home-layout" style={{ padding: '4rem 1.5rem', display: 'flex', flexDirection: 'row', gap: '2rem', flexWrap: 'wrap' }}>
         
         {/* Main Content */}
-        <div style={{ flex: '3 1 70%' }}>
+        <div className="home-main-content" style={{ flex: '3 1 70%' }}>
 
           {/* Error State */}
           {error && (
@@ -498,7 +498,7 @@ export function Home() {
         </div>
 
         {/* Sidebar */}
-        <aside style={{ flex: '1 1 25%', minWidth: '300px', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        <aside className="home-sidebar" style={{ flex: '1 1 25%', minWidth: '300px', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
           
           {/* Top Anime Card */}
           <div style={{ backgroundColor: 'var(--bg-color-secondary)', borderRadius: '1rem', padding: '1.5rem', border: '1px solid var(--border-color)' }}>

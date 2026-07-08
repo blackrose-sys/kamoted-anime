@@ -363,3 +363,220 @@ button {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* ═══════════════════════════════════════════════════ */
+/*  MOBILE RESPONSIVE OVERRIDES                       */
+/* ═══════════════════════════════════════════════════ */
+
+/* Hidden utility classes */
+.hidden { display: none !important; }
+
+@media (min-width: 640px) {
+  .sm\:inline { display: inline !important; }
+  .sm\:flex { display: flex !important; }
+  .sm\:block { display: block !important; }
+}
+
+@media (min-width: 768px) {
+  .md\:flex { display: flex !important; }
+  .md\:block { display: block !important; }
+  .md\:inline { display: inline !important; }
+  .md\:flex-row { flex-direction: row !important; }
+}
+
+@media (min-width: 1024px) {
+  .lg\:flex { display: flex !important; }
+  .lg\:block { display: block !important; }
+}
+
+/* ── Mobile-first container ── */
+@media (max-width: 639px) {
+  .container {
+    padding: 0 1rem !important;
+  }
+}
+
+/* ── Mobile Navbar ── */
+@media (max-width: 767px) {
+  .nav-links-desktop {
+    display: none !important;
+  }
+
+  .nav-discord-desktop {
+    display: none !important;
+  }
+
+  .mobile-menu-btn {
+    display: flex !important;
+  }
+
+  .animated-logo {
+    font-size: 1.15rem !important;
+  }
+
+  .logo-icon {
+    width: 22px !important;
+    height: 22px !important;
+  }
+}
+
+@media (min-width: 768px) {
+  .mobile-menu-btn {
+    display: none !important;
+  }
+
+  .mobile-menu-overlay {
+    display: none !important;
+  }
+}
+
+/* ── Hero Responsive ── */
+@media (max-width: 639px) {
+  .hero-wrapper {
+    min-height: 45vh !important;
+  }
+
+  .hero-wrapper .container {
+    padding-top: 70px !important;
+    padding-bottom: 40px !important;
+  }
+
+  .hero-title {
+    font-size: 1.5rem !important;
+    max-width: 100% !important;
+    line-height: 1.15 !important;
+  }
+
+  .hero-synopsis {
+    font-size: 0.8rem !important;
+    max-width: 100% !important;
+    -webkit-line-clamp: 3 !important;
+    display: -webkit-box !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+    margin-bottom: 1.25rem !important;
+  }
+
+  .hero-badge {
+    font-size: 0.65rem !important;
+    padding: 0.2rem 0.55rem !important;
+  }
+
+  .hero-indicators {
+    bottom: 10px !important;
+    right: 10px !important;
+  }
+}
+
+@media (min-width: 640px) and (max-width: 767px) {
+  .hero-title {
+    font-size: 2rem !important;
+  }
+
+  .hero-synopsis {
+    font-size: 0.88rem !important;
+    -webkit-line-clamp: 4 !important;
+    display: -webkit-box !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+  }
+}
+
+/* ── Main content + sidebar ── */
+@media (max-width: 1023px) {
+  .home-layout {
+    flex-direction: column !important;
+  }
+
+  .home-main-content {
+    flex: 1 1 100% !important;
+  }
+
+  .home-sidebar {
+    min-width: 0 !important;
+    flex: 1 1 100% !important;
+  }
+}
+
+/* ── Section titles ── */
+@media (max-width: 639px) {
+  .section-title {
+    font-size: 1.1rem !important;
+  }
+}
+
+/* ── Footer mobile ── */
+@media (max-width: 639px) {
+  .footer-grid {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 1.5rem !important;
+  }
+}
+
+/* ── Floating buttons mobile (music + chat) ── */
+@media (max-width: 639px) {
+  .ambient-fab {
+    width: 46px !important;
+    height: 46px !important;
+    bottom: 1rem !important;
+    left: 1rem !important;
+  }
+
+  .chat-fab {
+    width: 46px !important;
+    height: 46px !important;
+    bottom: 1rem !important;
+    right: 1rem !important;
+  }
+}
+
+/* ── Watch page mobile ── */
+@media (max-width: 767px) {
+  .watch-layout {
+    flex-direction: column !important;
+  }
+}
+
+/* ── Browse / Grid mobile ── */
+@media (max-width: 479px) {
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)) !important;
+    gap: 0.65rem !important;
+  }
+
+  .anime-card-content {
+    padding: 0.65rem !important;
+  }
+}
+
+/* ── Contact form mobile ── */
+@media (max-width: 479px) {
+  .contact-name-row {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ── Profile page mobile ── */
+@media (max-width: 639px) {
+  .profile-header {
+    flex-direction: column !important;
+    text-align: center !important;
+  }
+}
+
+/* ── Scrollbar global styling ── */
+@media (max-width: 767px) {
+  ::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+  }
+}

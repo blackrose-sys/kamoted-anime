@@ -37,6 +37,9 @@ jobs:
       - name: Make Gradle Wrapper Executable
         run: chmod +x android/gradlew
 
+      - name: Exclude Audio Assets from APK
+        run: rm -rf dist/lofi
+
       - name: Sync Capacitor Android
         run: |
           npx cap sync android > sync_log.txt 2>&1 || true

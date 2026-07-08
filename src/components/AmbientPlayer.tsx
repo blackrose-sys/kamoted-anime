@@ -19,6 +19,8 @@ const CATEGORIES = [
   { slug: 'jazz', label: 'Jazz Lounge', emoji: '🎷' },
 ];
 
+const VERCEL_PRODUCTION_URL = 'https://kamoted-anime.vercel.app';
+
 function trackUrl(title: string) {
   const filename = title
     .toLowerCase()
@@ -26,6 +28,11 @@ function trackUrl(title: string) {
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '')
     + '.mp3';
+    
+  // If running inside Capacitor on mobile, stream music files from Vercel
+  if ((window as any).Capacitor) {
+    return `${VERCEL_PRODUCTION_URL}/lofi/${filename}`;
+  }
   return `/lofi/${filename}`;
 }
 

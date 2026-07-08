@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { UserBadge } from './UserBadge';
+import { useProfileCache, resolveUsername, resolveAvatar } from '../hooks/useProfileCache';
 
 interface Comment {
   id: string;
@@ -99,6 +100,10 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
 
   const MAX_LENGTH = 1000;
   const numericAnimeId = parseInt(animeId);
+
+  // ── Real-time profile cache: always shows latest avatar/username ──
+  const commentUserIds = comments.map(c => c.user_id);
+  const profileCache = useProfileCache(commentUserIds);
 
   // Fetch comments for this anime + episode
   const fetchComments = useCallback(async () => {
@@ -650,12 +655,12 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
                 }}
               >
                 {/* Avatar */}
-                <Link to={`/user/${comment.username}`} style={{ textDecoration: 'none' }} className="hover-scale">
+                <Link to={`/user/${resolveUsername(profileCache, comment.user_id, comment.username)}`} style={{ textDecoration: 'none' }} className="hover-scale">
                   <div style={{
                     width: '36px',
                     height: '36px',
                     borderRadius: '50%',
-                    background: getAvatarColor(comment.username),
+                    background: getAvatarColor(resolveUsername(profileCache, comment.user_id, comment.username)),
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -666,10 +671,10 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
                     border: '2px solid rgba(255,255,255,0.08)',
                     overflow: 'hidden',
                   }}>
-                    {comment.avatar_url ? (
-                      <img src={comment.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    {resolveAvatar(profileCache, comment.user_id, comment.avatar_url) ? (
+                      <img src={resolveAvatar(profileCache, comment.user_id, comment.avatar_url)!} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (
-                      getInitials(comment.username)
+                      getInitials(resolveUsername(profileCache, comment.user_id, comment.username))
                     )}
                   </div>
                 </Link>
@@ -677,13 +682,13 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
                 {/* Content */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem', flexWrap: 'wrap' }}>
-                    <Link to={`/user/${comment.username}`} style={{
+                    <Link to={`/user/${resolveUsername(profileCache, comment.user_id, comment.username)}`} style={{
                       fontWeight: 800,
                       fontSize: '0.85rem',
                       color: user && comment.user_id === user.id ? 'var(--accent-primary)' : 'white',
                       textDecoration: 'none',
                     }} className="hover-underline">
-                      {comment.username}
+                      {resolveUsername(profileCache, comment.user_id, comment.username)}
                       {user && comment.user_id === user.id && (
                         <span style={{
                           marginLeft: '0.4rem',
@@ -701,7 +706,7 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
                         </span>
                       )}
                     </Link>
-                    <UserBadge username={comment.username} size="sm" />
+                    <UserBadge username={resolveUsername(profileCache, comment.user_id, comment.username)} size="sm" />
                     <span style={{
                       display: 'inline-flex',
                       alignItems: 'center',

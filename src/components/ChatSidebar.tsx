@@ -4,6 +4,7 @@ import { MessageCircle, X, Send, Loader2, ChevronDown, Trash2, ExternalLink, Use
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { UserBadge } from './UserBadge';
+import { useProfileCache, resolveUsername, resolveAvatar } from '../hooks/useProfileCache';
 
 // reactions shape: { "👍": ["uid1","uid2"], "❤️": ["uid3"] }
 type Reactions = Record<string, string[]>;
@@ -96,7 +97,7 @@ export function ChatSidebar() {
   const [onlineCount, setOnlineCount] = useState(1);
   const [onlineUsers, setOnlineUsers] = useState<{ uid: string; username: string; avatar_url: string | null; device?: string }[]>([]);
   const [showOnlineList, setShowOnlineList] = useState(false);
-  const [activeBar, setActiveBar] = useState<string | null>(null);   // message id with emoji bar open
+  const [activeBar, setActiveBar] = useState<string | null>(null);
   const [hoverCard, setHoverCard] = useState<HoverCard | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [reactionTooltip, setReactionTooltip] = useState<{ msgId: string; emoji: string; names: string[]; x: number; y: number } | null>(null);
@@ -115,6 +116,10 @@ export function ChatSidebar() {
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const MAX_CHARS = 500;
+
+  // ── Real-time profile cache: always shows latest avatar/username ──
+  const profileUserIds = messages.map(m => m.user_id);
+  const profileCache = useProfileCache(profileUserIds);
 
   const broadcastTyping = useCallback((typingState: boolean) => {
     if (!user || !channelRef.current) return;
@@ -447,7 +452,13 @@ export function ChatSidebar() {
     e.stopPropagation();
     if (hoverTimer.current) clearTimeout(hoverTimer.current);
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setHoverCard({ userId: msg.user_id, username: msg.username, avatarUrl: msg.avatar_url, x: r.right + 10, y: r.top });
+    setHoverCard({
+      userId: msg.user_id,
+      username: resolveUsername(profileCache, msg.user_id, msg.username),
+      avatarUrl: resolveAvatar(profileCache, msg.user_id, msg.avatar_url),
+      x: r.right + 10,
+      y: r.top
+    });
   };
   const closeHoverCard = () => { hoverTimer.current = setTimeout(() => setHoverCard(null), 250); };
 
@@ -685,8 +696,8 @@ export function ChatSidebar() {
                       <div style={{ width: 30, flexShrink: 0, display: 'flex', justifyContent: 'center' }}>
                         {!grouped && (
                           <UserAvatar
-                            username={msg.username}
-                            avatarUrl={msg.avatar_url}
+                            username={resolveUsername(profileCache, msg.user_id, msg.username)}
+                            avatarUrl={resolveAvatar(profileCache, msg.user_id, msg.avatar_url)}
                             size={30}
                             onClick={(e) => openHoverCard(e, msg)}
                           />
@@ -698,14 +709,14 @@ export function ChatSidebar() {
                         {!grouped && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexDirection: isMe ? 'row-reverse' : 'row' }}>
                             <button
-                              onClick={() => navigate(`/user/${msg.username}`)}
+                              onClick={() => navigate(`/user/${resolveUsername(profileCache, msg.user_id, msg.username)}`)}
                               style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '0.71rem', fontWeight: 800, color: isMe ? 'var(--accent-primary)' : '#a78bfa', transition: 'opacity 0.15s' }}
                               onMouseOver={e => (e.currentTarget as HTMLButtonElement).style.opacity = '0.7'}
                               onMouseOut={e => (e.currentTarget as HTMLButtonElement).style.opacity = '1'}
                             >
-                              {isMe ? 'You' : msg.username}
+                              {isMe ? 'You' : resolveUsername(profileCache, msg.user_id, msg.username)}
                             </button>
-                            <UserBadge username={msg.username} size="sm" />
+                            <UserBadge username={resolveUsername(profileCache, msg.user_id, msg.username)} size="sm" />
                             <span style={{ fontSize: '0.59rem', color: 'rgba(255,255,255,0.22)', fontWeight: 600 }}>
                               {timeAgo(msg.created_at)}
                             </span>

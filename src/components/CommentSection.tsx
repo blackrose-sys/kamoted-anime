@@ -209,8 +209,8 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
       return;
     }
 
-    if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
-      alert('Only images and videos are supported');
+    if (!file.type.startsWith('image/')) {
+      alert('Only images are supported');
       return;
     }
 
@@ -438,11 +438,7 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {mediaPreview && (
                 <div style={{ position: 'relative', width: 'max-content', alignSelf: 'flex-start' }}>
-                  {mediaFile?.type.startsWith('video/') ? (
-                    <video src={mediaPreview} style={{ height: '100px', borderRadius: '0.5rem', backgroundColor: '#000' }} />
-                  ) : (
-                    <img src={mediaPreview} alt="preview" style={{ height: '100px', borderRadius: '0.5rem', objectFit: 'contain', backgroundColor: 'rgba(0,0,0,0.2)' }} />
-                  )}
+                  <img src={mediaPreview} alt="preview" style={{ height: '100px', borderRadius: '0.5rem', objectFit: 'contain', backgroundColor: 'rgba(0,0,0,0.2)' }} />
                   <button 
                     onClick={removeMedia}
                     style={{
@@ -494,7 +490,7 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
 
                 <input 
                   type="file"
-                  accept="image/*,video/*"
+                  accept="image/*"
                   ref={fileInputRef}
                   style={{ display: 'none' }}
                   onChange={handleFileChange}
@@ -850,13 +846,6 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
                   </div>
                   {comment.media_url && (
                     <div style={{ marginTop: '0.4rem', marginBottom: '0.6rem', borderRadius: '0.5rem', overflow: 'hidden', maxWidth: '300px' }}>
-                      {comment.media_type?.startsWith('video/') ? (
-                        <video 
-                          src={comment.media_url} 
-                          controls 
-                          style={{ width: '100%', maxHeight: '240px', backgroundColor: '#000' }} 
-                        />
-                      ) : (
                         <a href={comment.media_url} target="_blank" rel="noopener noreferrer">
                           <img 
                             src={comment.media_url} 
@@ -864,7 +853,6 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
                             style={{ width: '100%', maxHeight: '240px', objectFit: 'contain', display: 'block', backgroundColor: 'rgba(0,0,0,0.2)' }} 
                           />
                         </a>
-                      )}
                     </div>
                   )}
                   {comment.content.trim() !== '' && (

@@ -371,8 +371,8 @@ export function ChatSidebar() {
       return;
     }
 
-    if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
-      alert('Only images and videos are supported');
+    if (!file.type.startsWith('image/')) {
+      alert('Only images are supported');
       return;
     }
 
@@ -808,13 +808,6 @@ export function ChatSidebar() {
                         }}>
                           {msg.media_url && (
                             <div style={{ borderRadius: '0.5rem', overflow: 'hidden', maxWidth: '240px' }}>
-                              {msg.media_type?.startsWith('video/') ? (
-                                <video 
-                                  src={msg.media_url} 
-                                  controls 
-                                  style={{ width: '100%', maxHeight: '200px', backgroundColor: '#000' }} 
-                                />
-                              ) : (
                                 <a href={msg.media_url} target="_blank" rel="noopener noreferrer">
                                   <img 
                                     src={msg.media_url} 
@@ -822,7 +815,6 @@ export function ChatSidebar() {
                                     style={{ width: '100%', maxHeight: '200px', objectFit: 'contain', display: 'block', backgroundColor: 'rgba(0,0,0,0.2)' }} 
                                   />
                                 </a>
-                              )}
                             </div>
                           )}
                           {msg.message.trim() !== '' && (
@@ -975,11 +967,7 @@ export function ChatSidebar() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 {mediaPreview && (
                   <div style={{ position: 'relative', width: 'max-content', marginBottom: '0.4rem' }}>
-                    {mediaFile?.type.startsWith('video/') ? (
-                      <video src={mediaPreview} style={{ height: '80px', borderRadius: '0.5rem', backgroundColor: '#000' }} />
-                    ) : (
-                      <img src={mediaPreview} alt="preview" style={{ height: '80px', borderRadius: '0.5rem', objectFit: 'contain', backgroundColor: 'rgba(0,0,0,0.2)' }} />
-                    )}
+                    <img src={mediaPreview} alt="preview" style={{ height: '80px', borderRadius: '0.5rem', objectFit: 'contain', backgroundColor: 'rgba(0,0,0,0.2)' }} />
                     <button 
                       onClick={removeMedia}
                       style={{
@@ -999,7 +987,7 @@ export function ChatSidebar() {
                   
                   <input 
                     type="file"
-                    accept="image/*,video/*"
+                    accept="image/*"
                     ref={fileInputRef}
                     style={{ display: 'none' }}
                     onChange={handleFileChange}

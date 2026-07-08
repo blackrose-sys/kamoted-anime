@@ -449,7 +449,7 @@ export function ChatSidebar() {
       removeMedia();
     } catch (err) {
       console.error('Failed to send:', err);
-      alert('Failed to send message');
+      alert('Failed to send message: ' + ((err as Error).message || JSON.stringify(err)));
       if (!mediaFile) {
         setMessages(prev => prev.filter(m => !m.id.startsWith('opt-')));
       }

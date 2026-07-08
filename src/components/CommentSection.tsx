@@ -275,7 +275,7 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
 
       if (error) {
         console.error('Failed to post comment:', error);
-        alert('Failed to post comment. Please try again.');
+        alert('Failed to post comment: ' + (error.message || JSON.stringify(error)));
         return;
       }
 

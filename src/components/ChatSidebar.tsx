@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { MessageCircle, X, Send, Loader2, ChevronDown, Trash2, ExternalLink, Users, Monitor, Smartphone } from 'lucide-react';
+import { MessageCircle, X, Send, Loader2, ChevronDown, Trash2, ExternalLink, Users, Monitor, Smartphone, ImagePlus } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { UserBadge } from './UserBadge';
@@ -15,6 +15,8 @@ interface ChatMessage {
   username: string;
   avatar_url: string | null;
   message: string;
+  media_url?: string;
+  media_type?: string;
   reactions: Reactions;
   created_at: string;
 }
@@ -114,6 +116,11 @@ export function ChatSidebar() {
   const [isMeTyping, setIsMeTyping] = useState(false);
   const channelRef = useRef<any>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Media upload
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [mediaPreview, setMediaPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const MAX_CHARS = 500;
 
@@ -354,11 +361,39 @@ export function ChatSidebar() {
     return () => document.removeEventListener('click', fn);
   }, []);
 
+  /* ─── Media Handlers ─── */
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      alert('File must be smaller than 10MB');
+      return;
+    }
+
+    if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+      alert('Only images and videos are supported');
+      return;
+    }
+
+    setMediaFile(file);
+    const url = URL.createObjectURL(file);
+    setMediaPreview(url);
+  };
+
+  const removeMedia = () => {
+    setMediaFile(null);
+    if (mediaPreview) URL.revokeObjectURL(mediaPreview);
+    setMediaPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   /* ─── Send ─── */
   const handleSend = async () => {
     if (!user) { navigate('/login'); return; }
     const text = input.trim();
-    if (!text || text.length > MAX_CHARS || sending) return;
+    if ((!text && !mediaFile) || text.length > MAX_CHARS || sending) return;
+    
     setSending(true);
     setInput('');
     if (typingTimeoutRef.current) {
@@ -366,20 +401,58 @@ export function ChatSidebar() {
     }
     setIsMeTyping(false);
     broadcastTyping(false);
-    // Optimistic
-    const opt: ChatMessage = {
-      id: `opt-${Date.now()}`, user_id: user.id, username: user.username,
-      avatar_url: user.avatar_url, message: text, reactions: {}, created_at: new Date().toISOString()
-    };
-    setMessages(prev => [...prev, opt]);
+
+    let media_url = null;
+    let media_type = null;
+
     try {
+      if (mediaFile) {
+        const fileExt = mediaFile.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+        const filePath = `${user.id}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('chat-media')
+          .upload(filePath, mediaFile);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('chat-media')
+          .getPublicUrl(filePath);
+
+        media_url = publicUrl;
+        media_type = mediaFile.type;
+      }
+
+      // Optimistic insert only if no media (too complex to simulate media upload visually here)
+      if (!mediaFile) {
+        const opt: ChatMessage = {
+          id: `opt-${Date.now()}`, user_id: user.id, username: user.username,
+          avatar_url: user.avatar_url, message: text, reactions: {}, created_at: new Date().toISOString()
+        };
+        setMessages(prev => [...prev, opt]);
+      }
+
       const { error } = await supabase.from('chat_messages').insert({
-        user_id: user.id, username: user.username, avatar_url: user.avatar_url, message: text, reactions: {}
+        user_id: user.id, 
+        username: user.username, 
+        avatar_url: user.avatar_url, 
+        message: text || ' ', 
+        reactions: {},
+        media_url,
+        media_type
       });
+      
       if (error) throw error;
-      // Remove optimistic once realtime INSERT arrives — or just leave it (deduplicated by id check)
-    } catch {
-      setMessages(prev => prev.filter(m => m.id !== opt.id));
+      
+      removeMedia();
+    } catch (err) {
+      console.error('Failed to send:', err);
+      alert('Failed to send message');
+      if (!mediaFile) {
+        setMessages(prev => prev.filter(m => !m.id.startsWith('opt-')));
+      }
       setInput(text);
     } finally {
       setSending(false);
@@ -724,15 +797,37 @@ export function ChatSidebar() {
                         )}
 
                         <div style={{
-                          padding: '0.52rem 0.82rem',
+                          display: 'flex', flexDirection: 'column', gap: '0.4rem',
+                          padding: (msg.message.trim() === '' && msg.media_url) ? '0' : '0.52rem 0.82rem',
                           borderRadius: isMe
                             ? (grouped ? '1.1rem 0.35rem 0.35rem 1.1rem' : '1.1rem 0.35rem 1.1rem 1.1rem')
                             : (grouped ? '0.35rem 1.1rem 1.1rem 0.35rem' : '0.35rem 1.1rem 1.1rem 1.1rem'),
-                          backgroundColor: isMe ? 'rgba(245,158,11,0.13)' : 'rgba(255,255,255,0.055)',
-                          border: `1px solid ${isMe ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.065)'}`,
-                          fontSize: '0.83rem', lineHeight: 1.5, wordBreak: 'break-word'
+                          backgroundColor: (msg.message.trim() === '' && msg.media_url) ? 'transparent' : (isMe ? 'rgba(245,158,11,0.13)' : 'rgba(255,255,255,0.055)'),
+                          border: (msg.message.trim() === '' && msg.media_url) ? 'none' : `1px solid ${isMe ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.065)'}`,
+                          fontSize: '0.83rem', lineHeight: 1.5, wordBreak: 'break-word', overflow: 'hidden'
                         }}>
-                          {msg.message}
+                          {msg.media_url && (
+                            <div style={{ borderRadius: '0.5rem', overflow: 'hidden', maxWidth: '240px' }}>
+                              {msg.media_type?.startsWith('video/') ? (
+                                <video 
+                                  src={msg.media_url} 
+                                  controls 
+                                  style={{ width: '100%', maxHeight: '200px', backgroundColor: '#000' }} 
+                                />
+                              ) : (
+                                <a href={msg.media_url} target="_blank" rel="noopener noreferrer">
+                                  <img 
+                                    src={msg.media_url} 
+                                    alt="attachment" 
+                                    style={{ width: '100%', maxHeight: '200px', objectFit: 'contain', display: 'block', backgroundColor: 'rgba(0,0,0,0.2)' }} 
+                                  />
+                                </a>
+                              )}
+                            </div>
+                          )}
+                          {msg.message.trim() !== '' && (
+                            <div>{msg.message}</div>
+                          )}
                         </div>
                       </div>
 
@@ -878,8 +973,53 @@ export function ChatSidebar() {
           }}>
             {user ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                {mediaPreview && (
+                  <div style={{ position: 'relative', width: 'max-content', marginBottom: '0.4rem' }}>
+                    {mediaFile?.type.startsWith('video/') ? (
+                      <video src={mediaPreview} style={{ height: '80px', borderRadius: '0.5rem', backgroundColor: '#000' }} />
+                    ) : (
+                      <img src={mediaPreview} alt="preview" style={{ height: '80px', borderRadius: '0.5rem', objectFit: 'contain', backgroundColor: 'rgba(0,0,0,0.2)' }} />
+                    )}
+                    <button 
+                      onClick={removeMedia}
+                      style={{
+                        position: 'absolute', top: -6, right: -6,
+                        width: 20, height: 20, borderRadius: '50%',
+                        backgroundColor: '#ef4444', color: 'white', border: 'none',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.5)'
+                      }}
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                )}
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                   <UserAvatar username={user.username} avatarUrl={user.avatar_url} size={28} />
+                  
+                  <input 
+                    type="file"
+                    accept="image/*,video/*"
+                    ref={fileInputRef}
+                    style={{ display: 'none' }}
+                    onChange={handleFileChange}
+                  />
+                  
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: mediaFile ? 'var(--accent-primary)' : 'rgba(255,255,255,0.4)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      padding: '0.4rem', borderRadius: '50%',
+                      transition: 'all 0.2s', flexShrink: 0
+                    }}
+                    onMouseOver={e => e.currentTarget.style.color = 'var(--accent-primary)'}
+                    onMouseOut={e => e.currentTarget.style.color = mediaFile ? 'var(--accent-primary)' : 'rgba(255,255,255,0.4)'}
+                  >
+                    <ImagePlus size={18} />
+                  </button>
+
                   <input
                     ref={inputRef}
                     type="text"
@@ -901,21 +1041,21 @@ export function ChatSidebar() {
                   />
                   <button
                     onClick={handleSend}
-                    disabled={sending || !input.trim()}
+                    disabled={sending || (!input.trim() && !mediaFile)}
                     style={{
                       width: 36, height: 36, borderRadius: '50%',
-                      background: input.trim() ? 'linear-gradient(135deg, var(--accent-primary), #8b5cf6)' : 'rgba(255,255,255,0.05)',
-                      border: 'none', cursor: input.trim() ? 'pointer' : 'not-allowed',
+                      background: (input.trim() || mediaFile) ? 'linear-gradient(135deg, var(--accent-primary), #8b5cf6)' : 'rgba(255,255,255,0.05)',
+                      border: 'none', cursor: (input.trim() || mediaFile) ? 'pointer' : 'not-allowed',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       flexShrink: 0, transition: 'all 0.2s',
-                      boxShadow: input.trim() ? '0 4px 14px rgba(245,158,11,0.35)' : 'none'
+                      boxShadow: (input.trim() || mediaFile) ? '0 4px 14px rgba(245,158,11,0.35)' : 'none'
                     }}
-                    onMouseOver={e => { if (input.trim()) (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.1)'; }}
+                    onMouseOver={e => { if (input.trim() || mediaFile) (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.1)'; }}
                     onMouseOut={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'; }}
                   >
                     {sending
                       ? <Loader2 size={14} color="black" className="animate-spin" />
-                      : <Send size={14} color={input.trim() ? 'black' : 'rgba(255,255,255,0.18)'} />
+                      : <Send size={14} color={(input.trim() || mediaFile) ? 'black' : 'rgba(255,255,255,0.18)'} />
                     }
                   </button>
                 </div>

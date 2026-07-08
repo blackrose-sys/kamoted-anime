@@ -384,3 +384,49 @@ CREATE POLICY "Dev can delete contact messages"
 -- Enable Realtime for contact_messages
 ALTER PUBLICATION supabase_realtime ADD TABLE contact_messages;
 
+
+-- ===================================================
+-- 10. Media Uploads (Photos, GIFs, Videos)
+-- ===================================================
+
+-- Add media columns to chat_messages
+ALTER TABLE public.chat_messages ADD COLUMN IF NOT EXISTS media_url TEXT;
+ALTER TABLE public.chat_messages ADD COLUMN IF NOT EXISTS media_type TEXT;
+
+-- Drop the old constraint and add a new one that allows empty text IF media is present
+ALTER TABLE public.chat_messages DROP CONSTRAINT IF EXISTS chat_messages_message_check;
+ALTER TABLE public.chat_messages ADD CONSTRAINT chat_messages_message_check 
+  CHECK (
+    (char_length(TRIM(message)) > 0 AND char_length(message) <= 500) 
+    OR 
+    (media_url IS NOT NULL)
+  );
+
+-- Add media columns to comments
+ALTER TABLE public.comments ADD COLUMN IF NOT EXISTS media_url TEXT;
+ALTER TABLE public.comments ADD COLUMN IF NOT EXISTS media_type TEXT;
+
+-- Drop the old constraint and add a new one that allows empty text IF media is present
+ALTER TABLE public.comments DROP CONSTRAINT IF EXISTS comments_content_check;
+ALTER TABLE public.comments ADD CONSTRAINT comments_content_check 
+  CHECK (
+    (char_length(TRIM(content)) > 0 AND char_length(content) <= 1000) 
+    OR 
+    (media_url IS NOT NULL)
+  );
+
+-- Create storage bucket for chat media
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('chat-media', 'chat-media', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Storage Policies for chat-media
+DROP POLICY IF EXISTS "Media is viewable by everyone" ON storage.objects;
+CREATE POLICY "Media is viewable by everyone" 
+ON storage.objects FOR SELECT 
+USING (bucket_id = 'chat-media');
+
+DROP POLICY IF EXISTS "Authenticated users can upload media" ON storage.objects;
+CREATE POLICY "Authenticated users can upload media" 
+ON storage.objects FOR INSERT 
+WITH CHECK (bucket_id = 'chat-media' AND auth.role() = 'authenticated');

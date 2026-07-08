@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { MessageSquare, Send, Trash2, Loader2, LogIn, Clock, MessageCircle } from 'lucide-react';
+import { MessageSquare, Send, Trash2, Loader2, LogIn, Clock, MessageCircle, ImagePlus, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -14,6 +14,8 @@ interface Comment {
   username: string;
   avatar_url: string | null;
   content: string;
+  media_url?: string;
+  media_type?: string;
   created_at: string;
   timestamp_sec?: number | null;
 }
@@ -97,6 +99,11 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
   const [seconds, setSeconds] = useState('');
   const listRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Media upload
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [mediaPreview, setMediaPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const MAX_LENGTH = 1000;
   const numericAnimeId = parseInt(animeId);
@@ -192,8 +199,35 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
     }
   };
 
+  /* ─── Media Handlers ─── */
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      alert('File must be smaller than 10MB');
+      return;
+    }
+
+    if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+      alert('Only images and videos are supported');
+      return;
+    }
+
+    setMediaFile(file);
+    const url = URL.createObjectURL(file);
+    setMediaPreview(url);
+  };
+
+  const removeMedia = () => {
+    setMediaFile(null);
+    if (mediaPreview) URL.revokeObjectURL(mediaPreview);
+    setMediaPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const handlePost = async () => {
-    if (!user || !newComment.trim() || posting) return;
+    if (!user || (!newComment.trim() && !mediaFile) || posting) return;
 
     setPosting(true);
     
@@ -204,15 +238,39 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
       timestamp_sec = m * 60 + s;
     }
 
+    let media_url = null;
+    let media_type = null;
+
     try {
+      if (mediaFile) {
+        const fileExt = mediaFile.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+        const filePath = `comments/${user.id}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('chat-media')
+          .upload(filePath, mediaFile);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('chat-media')
+          .getPublicUrl(filePath);
+
+        media_url = publicUrl;
+        media_type = mediaFile.type;
+      }
+
       const { error } = await supabase.from('comments').insert({
         user_id: user.id,
         anime_id: numericAnimeId,
         episode,
         username: user.username,
         avatar_url: user.avatar_url || null,
-        content: newComment.trim(),
-        timestamp_sec
+        content: newComment.trim() || ' ',
+        timestamp_sec,
+        media_url,
+        media_type
       });
 
       if (error) {
@@ -225,6 +283,7 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
       setMinutes('');
       setSeconds('');
       setAttachTimestamp(false);
+      removeMedia();
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
       }
@@ -376,69 +435,126 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
             </div>
 
             {/* Input Area */}
-            <div style={{ flex: 1, position: 'relative' }}>
-              <textarea
-                ref={textareaRef}
-                value={newComment}
-                onChange={(e) => handleTextareaChange(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={`Share your thoughts on Episode ${episode}...`}
-                rows={1}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 1rem',
-                  paddingRight: '3.5rem',
-                  borderRadius: '0.75rem',
-                  backgroundColor: 'var(--bg-color-tertiary)',
-                  border: '1px solid var(--border-color)',
-                  color: 'white',
-                  outline: 'none',
-                  fontSize: '0.9rem',
-                  lineHeight: 1.5,
-                  resize: 'none',
-                  fontFamily: 'inherit',
-                  transition: 'border-color 0.2s, box-shadow 0.2s',
-                  minHeight: '44px',
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = 'var(--accent-primary)';
-                  e.target.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.1)';
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = 'var(--border-color)';
-                  e.target.style.boxShadow = 'none';
-                }}
-              />
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {mediaPreview && (
+                <div style={{ position: 'relative', width: 'max-content', alignSelf: 'flex-start' }}>
+                  {mediaFile?.type.startsWith('video/') ? (
+                    <video src={mediaPreview} style={{ height: '100px', borderRadius: '0.5rem', backgroundColor: '#000' }} />
+                  ) : (
+                    <img src={mediaPreview} alt="preview" style={{ height: '100px', borderRadius: '0.5rem', objectFit: 'contain', backgroundColor: 'rgba(0,0,0,0.2)' }} />
+                  )}
+                  <button 
+                    onClick={removeMedia}
+                    style={{
+                      position: 'absolute', top: -8, right: -8,
+                      width: 24, height: 24, borderRadius: '50%',
+                      backgroundColor: '#ef4444', color: 'white', border: 'none',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.5)', zIndex: 10
+                    }}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
 
-              {/* Send Button (inside textarea area) */}
-              <button
-                onClick={handlePost}
-                disabled={!newComment.trim() || posting}
-                style={{
-                  position: 'absolute',
-                  right: '0.5rem',
-                  bottom: '0.5rem',
-                  width: '34px',
-                  height: '34px',
-                  borderRadius: '0.5rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: newComment.trim()
-                    ? 'linear-gradient(135deg, var(--accent-primary), #d97706)'
-                    : 'rgba(255,255,255,0.05)',
-                  border: 'none',
-                  cursor: newComment.trim() ? 'pointer' : 'default',
-                  transition: 'all 0.2s',
-                  transform: newComment.trim() ? 'scale(1)' : 'scale(0.9)',
-                }}
-              >
-                {posting ? (
-                  <Loader2 size={16} color="#000" className="animate-spin" />
-                ) : (
-                  <Send size={16} color={newComment.trim() ? '#000' : 'var(--text-secondary)'} />
-                )}
-              </button>
+              <div style={{ position: 'relative' }}>
+                <textarea
+                  ref={textareaRef}
+                  value={newComment}
+                  onChange={(e) => handleTextareaChange(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={`Share your thoughts on Episode ${episode}...`}
+                  rows={1}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    paddingRight: '5.5rem', // Make room for both buttons
+                    borderRadius: '0.75rem',
+                    backgroundColor: 'var(--bg-color-tertiary)',
+                    border: '1px solid var(--border-color)',
+                    color: 'white',
+                    outline: 'none',
+                    fontSize: '0.9rem',
+                    lineHeight: 1.5,
+                    resize: 'none',
+                    fontFamily: 'inherit',
+                    transition: 'border-color 0.2s, box-shadow 0.2s',
+                    minHeight: '44px',
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = 'var(--accent-primary)';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = 'var(--border-color)';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                />
+
+                <input 
+                  type="file"
+                  accept="image/*,video/*"
+                  ref={fileInputRef}
+                  style={{ display: 'none' }}
+                  onChange={handleFileChange}
+                />
+
+                {/* Attachment Button */}
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    position: 'absolute',
+                    right: '3rem',
+                    bottom: '0.5rem',
+                    width: '34px',
+                    height: '34px',
+                    borderRadius: '0.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'transparent',
+                    border: 'none',
+                    color: mediaFile ? 'var(--accent-primary)' : 'rgba(255,255,255,0.4)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseOver={e => e.currentTarget.style.color = 'var(--accent-primary)'}
+                  onMouseOut={e => e.currentTarget.style.color = mediaFile ? 'var(--accent-primary)' : 'rgba(255,255,255,0.4)'}
+                >
+                  <ImagePlus size={18} />
+                </button>
+
+                {/* Send Button */}
+                <button
+                  onClick={handlePost}
+                  disabled={(!newComment.trim() && !mediaFile) || posting}
+                  style={{
+                    position: 'absolute',
+                    right: '0.5rem',
+                    bottom: '0.5rem',
+                    width: '34px',
+                    height: '34px',
+                    borderRadius: '0.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: (newComment.trim() || mediaFile)
+                      ? 'linear-gradient(135deg, var(--accent-primary), #d97706)'
+                      : 'rgba(255,255,255,0.05)',
+                    border: 'none',
+                    cursor: (newComment.trim() || mediaFile) ? 'pointer' : 'default',
+                    transition: 'all 0.2s',
+                    transform: (newComment.trim() || mediaFile) ? 'scale(1)' : 'scale(0.9)',
+                  }}
+                >
+                  {posting ? (
+                    <Loader2 size={16} color="#000" className="animate-spin" />
+                  ) : (
+                    <Send size={16} color={(newComment.trim() || mediaFile) ? '#000' : 'var(--text-secondary)'} />
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         ) : (
@@ -732,14 +848,35 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
                       </span>
                     )}
                   </div>
-                  <p style={{
-                    fontSize: '0.875rem',
-                    color: 'rgba(255,255,255,0.85)',
-                    lineHeight: 1.6,
-                    wordBreak: 'break-word',
-                  }}>
-                    {comment.content}
-                  </p>
+                  {comment.media_url && (
+                    <div style={{ marginTop: '0.4rem', marginBottom: '0.6rem', borderRadius: '0.5rem', overflow: 'hidden', maxWidth: '300px' }}>
+                      {comment.media_type?.startsWith('video/') ? (
+                        <video 
+                          src={comment.media_url} 
+                          controls 
+                          style={{ width: '100%', maxHeight: '240px', backgroundColor: '#000' }} 
+                        />
+                      ) : (
+                        <a href={comment.media_url} target="_blank" rel="noopener noreferrer">
+                          <img 
+                            src={comment.media_url} 
+                            alt="attachment" 
+                            style={{ width: '100%', maxHeight: '240px', objectFit: 'contain', display: 'block', backgroundColor: 'rgba(0,0,0,0.2)' }} 
+                          />
+                        </a>
+                      )}
+                    </div>
+                  )}
+                  {comment.content.trim() !== '' && (
+                    <p style={{
+                      fontSize: '0.875rem',
+                      color: 'rgba(255,255,255,0.85)',
+                      lineHeight: 1.6,
+                      wordBreak: 'break-word',
+                    }}>
+                      {comment.content}
+                    </p>
+                  )}
                 </div>
 
                 {/* Delete (own comments only) */}

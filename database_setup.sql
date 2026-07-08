@@ -429,4 +429,5 @@ USING (bucket_id = 'chat-media');
 DROP POLICY IF EXISTS "Authenticated users can upload media" ON storage.objects;
 CREATE POLICY "Authenticated users can upload media" 
 ON storage.objects FOR INSERT 
-WITH CHECK (bucket_id = 'chat-media' AND auth.role() = 'authenticated');
+TO authenticated
+WITH CHECK (bucket_id = 'chat-media');

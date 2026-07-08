@@ -47,6 +47,8 @@ jobs:
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           if grep -q "failed" sync_log.txt || grep -q "error" sync_log.txt || [ ! -f "android/app/src/main/assets/capacitor.config.json" ]; then
             echo "Capacitor Sync Failed"
+            ERROR_MSG=$(tail -n 25 sync_log.txt | tr '\n' ' ' | tr -d '"' | tr -d "'")
+            echo "::error::Capacitor Sync Failed: $ERROR_MSG"
             exit 1
           fi
 

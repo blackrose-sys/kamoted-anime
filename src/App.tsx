@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { Home } from './pages/Home';
@@ -16,11 +16,60 @@ import { Lists } from './pages/Lists';
 import { Contact } from './pages/Contact';
 import { AmbientPlayer } from './components/AmbientPlayer';
 import { AuthProvider } from './context/AuthContext';
+import { useEffect } from 'react';
+import { App as CapApp } from '@capacitor/app';
+import { StatusBar, Style } from '@capacitor/status-bar';
+
+function MobileNativeBridge() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Customize Status Bar styling on mobile
+    const setupStatusBar = async () => {
+      try {
+        await StatusBar.setStyle({ style: Style.Dark });
+        await StatusBar.setBackgroundColor({ color: '#030303' });
+      } catch (err) {
+        console.log('Status bar setup not supported on this platform:', err);
+      }
+    };
+
+    // Handle physical Android back button
+    let backListener: any;
+    const setupBackButton = async () => {
+      try {
+        backListener = await CapApp.addListener('backButton', () => {
+          if (window.location.pathname === '/') {
+            CapApp.exitApp();
+          } else {
+            navigate(-1);
+          }
+        });
+      } catch (err) {
+        console.log('Back button handler not supported on this platform:', err);
+      }
+    };
+
+    if ((window as any).Capacitor) {
+      setupStatusBar();
+      setupBackButton();
+    }
+
+    return () => {
+      if (backListener) {
+        backListener.remove();
+      }
+    };
+  }, [navigate]);
+
+  return null;
+}
 
 function App() {
   return (
     <AuthProvider>
       <Router>
+        <MobileNativeBridge />
         <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
           <Navbar />
           <Routes>

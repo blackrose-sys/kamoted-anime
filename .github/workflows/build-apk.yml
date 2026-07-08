@@ -39,7 +39,7 @@ jobs:
 
       - name: Sync Capacitor Android
         run: |
-          npx cap sync android --verbose > sync_log.txt 2>&1 || true
+          npx cap sync android > sync_log.txt 2>&1 || true
           cat sync_log.txt
           echo "### Capacitor Sync Log" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

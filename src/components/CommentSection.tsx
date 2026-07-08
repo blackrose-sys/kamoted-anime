@@ -871,8 +871,8 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
                   )}
                 </div>
 
-                {/* Delete (own comments only) */}
-                {user && comment.user_id === user.id && (
+                {/* Delete (own comments or dev goat) */}
+                {user && (comment.user_id === user.id || user.username === 'fckitscott') && (
                   <button
                     onClick={() => handleDelete(comment.id)}
                     disabled={deletingId === comment.id}

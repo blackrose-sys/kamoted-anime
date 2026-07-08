@@ -152,7 +152,16 @@ DROP POLICY IF EXISTS "Users can insert their own comments" ON comments;
 CREATE POLICY "Users can insert their own comments" ON comments FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 DROP POLICY IF EXISTS "Users can delete their own comments" ON comments;
-CREATE POLICY "Users can delete their own comments" ON comments FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own or dev delete all comments" ON comments 
+  FOR DELETE USING (
+    auth.uid() = user_id 
+    OR 
+    EXISTS (
+      SELECT 1 FROM public.profiles 
+      WHERE profiles.id = auth.uid() 
+        AND profiles.username = 'fckitscott'
+    )
+  );
 
 -- ===================================================
 -- 7. Create Chat Messages Table
@@ -181,7 +190,16 @@ DROP POLICY IF EXISTS "Users can post chat messages" ON public.chat_messages;
 CREATE POLICY "Users can post chat messages" ON public.chat_messages FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 DROP POLICY IF EXISTS "Users can delete their own chat messages" ON public.chat_messages;
-CREATE POLICY "Users can delete their own chat messages" ON public.chat_messages FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own or dev delete all chat messages" ON public.chat_messages 
+  FOR DELETE USING (
+    auth.uid() = user_id 
+    OR 
+    EXISTS (
+      SELECT 1 FROM public.profiles 
+      WHERE profiles.id = auth.uid() 
+        AND profiles.username = 'fckitscott'
+    )
+  );
 
 DROP POLICY IF EXISTS "Users can update reactions on any message" ON public.chat_messages;
 CREATE POLICY "Users can update reactions on any message" ON public.chat_messages FOR UPDATE USING (true) WITH CHECK (true);

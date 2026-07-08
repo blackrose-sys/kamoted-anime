@@ -869,7 +869,7 @@ export function ChatSidebar() {
                             );
                           })}
 
-                          {isMe && (
+                          {(isMe || user?.username === 'fckitscott') && (
                             <>
                               <div style={{ width: 1, height: 16, backgroundColor: 'rgba(255,255,255,0.1)', margin: '0 0.15rem' }} />
                               <button

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Navigate, Link } from 'react-router-dom';
-import { Loader2, Bookmark, Clock, Trash2, Play, Camera, X, Check, Save, User, Mail, ZoomIn, ZoomOut, Globe, Lock, List } from 'lucide-react';
+import { Loader2, Bookmark, Clock, Trash2, Play, Camera, X, Check, Save, User, Mail, ZoomIn, ZoomOut, Globe, Lock, List, Shield, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { getAnimeDetails } from '../lib/animeServers';
 import { UserBadge } from '../components/UserBadge';
@@ -10,7 +10,7 @@ export function Profile() {
   const { user, updateUser, isLoading } = useAuth();
   
   // Tab management
-  const [activeTab, setActiveTab] = useState<'settings' | 'watchlist' | 'history' | 'lists'>('settings');
+  const [activeTab, setActiveTab] = useState<'settings' | 'security' | 'watchlist' | 'history' | 'lists'>('settings');
   const [watchlist, setWatchlist] = useState<any[]>([]);
   const [history, setHistory] = useState<any[]>([]);
   const [myLists, setMyLists] = useState<any[]>([]);
@@ -46,6 +46,16 @@ export function Profile() {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [initialPos, setInitialPos] = useState({ x: 0, y: 0 });
+
+  // Security tab state
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [securityLoading, setSecurityLoading] = useState(false);
+  const [securityError, setSecurityError] = useState('');
+  const [securitySuccess, setSecuritySuccess] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -413,6 +423,27 @@ export function Profile() {
         >
           <List size={16} /> PLAYLISTS
         </button>
+        <button 
+          onClick={() => setActiveTab('security')} 
+          style={{ 
+            background: 'none', 
+            border: 'none', 
+            color: activeTab === 'security' ? 'var(--accent-primary)' : 'var(--text-secondary)', 
+            fontWeight: 900, 
+            cursor: 'pointer', 
+            padding: '0.5rem 1rem', 
+            display: 'flex', 
+            alignItems: 'center',
+            gap: '0.5rem',
+            fontSize: '0.9rem',
+            letterSpacing: '0.05em',
+            transition: 'color 0.2s',
+            borderBottom: activeTab === 'security' ? '2px solid var(--accent-primary)' : '2px solid transparent',
+            marginBottom: '-17px'
+          }}
+        >
+          <Shield size={16} /> SECURITY
+        </button>
       </div>
 
       {/* Main Glassmorphism Card */}
@@ -702,6 +733,170 @@ export function Profile() {
                 {updatingUsername ? 'Saving...' : 'Save Changes'}
               </button>
             </form>
+          </div>
+        )}
+
+        {/* TAB: SECURITY */}
+        {activeTab === 'security' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', maxWidth: '500px', width: '100%', margin: '0 auto' }}>
+            <div>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Shield size={22} color="var(--accent-primary)" /> Security
+              </h2>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>Update your password to keep your account secure.</p>
+            </div>
+
+            {securityError && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#fca5a5', padding: '0.85rem 1rem', borderRadius: '0.75rem', fontSize: '0.85rem', fontWeight: 600 }}>
+                <X size={18} color="#ef4444" style={{ flexShrink: 0 }} />
+                {securityError}
+              </div>
+            )}
+
+            {securitySuccess ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', textAlign: 'center', padding: '2rem 0' }}>
+                <div style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'rgba(74, 222, 128, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <CheckCircle2 size={28} color="#4ade80" />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: '0.25rem' }}>Password Updated!</h3>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', lineHeight: 1.5 }}>Your password has been changed successfully.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setSecuritySuccess(false); setCurrentPassword(''); setNewPassword(''); setConfirmNewPassword(''); }}
+                  style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
+                >
+                  Change again
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                setSecurityError('');
+                if (newPassword.length < 6) { setSecurityError('New password must be at least 6 characters.'); return; }
+                if (newPassword !== confirmNewPassword) { setSecurityError('New passwords do not match.'); return; }
+                setSecurityLoading(true);
+                try {
+                  // Re-authenticate with current password
+                  const { error: signInError } = await supabase.auth.signInWithPassword({
+                    email: user.email || '',
+                    password: currentPassword,
+                  });
+                  if (signInError) { setSecurityError('Current password is incorrect.'); setSecurityLoading(false); return; }
+                  // Update to new password
+                  const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+                  if (updateError) throw updateError;
+                  setSecuritySuccess(true);
+                } catch (err: any) {
+                  setSecurityError(err.message || 'Failed to update password.');
+                } finally {
+                  setSecurityLoading(false);
+                }
+              }} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                {/* Current Password */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>Current Password</label>
+                  <div style={{ position: 'relative' }}>
+                    <Lock size={18} color="var(--text-secondary)" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }} />
+                    <input
+                      type={showCurrentPassword ? 'text' : 'password'}
+                      required
+                      placeholder="Enter current password"
+                      value={currentPassword}
+                      onChange={e => setCurrentPassword(e.target.value)}
+                      style={{ width: '100%', padding: '0.85rem 2.75rem 0.85rem 2.75rem', borderRadius: '0.75rem', backgroundColor: 'var(--bg-color-secondary)', border: '1px solid var(--border-color)', color: 'white', outline: 'none', fontSize: '0.95rem', transition: 'border-color 0.2s, box-shadow 0.2s' }}
+                      onFocus={e => { e.target.style.borderColor = 'var(--accent-primary)'; e.target.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.15)'; }}
+                      onBlur={e => { e.target.style.borderColor = 'var(--border-color)'; e.target.style.boxShadow = 'none'; }}
+                    />
+                    <button type="button" onClick={() => setShowCurrentPassword(!showCurrentPassword)} style={{ position: 'absolute', right: '0.85rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                      {showCurrentPassword ? <EyeOff size={18} color="var(--text-secondary)" /> : <Eye size={18} color="var(--text-secondary)" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ width: '100%', height: '1px', backgroundColor: 'var(--border-color)' }} />
+
+                {/* New Password */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>New Password</label>
+                  <div style={{ position: 'relative' }}>
+                    <Lock size={18} color="var(--text-secondary)" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }} />
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      required
+                      placeholder="At least 6 characters"
+                      value={newPassword}
+                      onChange={e => setNewPassword(e.target.value)}
+                      style={{ width: '100%', padding: '0.85rem 2.75rem 0.85rem 2.75rem', borderRadius: '0.75rem', backgroundColor: 'var(--bg-color-secondary)', border: '1px solid var(--border-color)', color: 'white', outline: 'none', fontSize: '0.95rem', transition: 'border-color 0.2s, box-shadow 0.2s' }}
+                      onFocus={e => { e.target.style.borderColor = 'var(--accent-primary)'; e.target.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.15)'; }}
+                      onBlur={e => { e.target.style.borderColor = 'var(--border-color)'; e.target.style.boxShadow = 'none'; }}
+                    />
+                    <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} style={{ position: 'absolute', right: '0.85rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                      {showNewPassword ? <EyeOff size={18} color="var(--text-secondary)" /> : <Eye size={18} color="var(--text-secondary)" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Confirm New Password */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>Confirm New Password</label>
+                  <div style={{ position: 'relative' }}>
+                    <Lock size={18} color="var(--text-secondary)" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }} />
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      required
+                      placeholder="Re-enter new password"
+                      value={confirmNewPassword}
+                      onChange={e => setConfirmNewPassword(e.target.value)}
+                      style={{ width: '100%', padding: '0.85rem 1rem 0.85rem 2.75rem', borderRadius: '0.75rem', backgroundColor: 'var(--bg-color-secondary)', border: '1px solid var(--border-color)', color: 'white', outline: 'none', fontSize: '0.95rem', transition: 'border-color 0.2s, box-shadow 0.2s' }}
+                      onFocus={e => { e.target.style.borderColor = 'var(--accent-primary)'; e.target.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.15)'; }}
+                      onBlur={e => { e.target.style.borderColor = 'var(--border-color)'; e.target.style.boxShadow = 'none'; }}
+                    />
+                  </div>
+                </div>
+
+                {/* Password strength checks */}
+                {newPassword.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.78rem', padding: '0.5rem 0.75rem', borderRadius: '0.5rem', backgroundColor: 'rgba(255,255,255,0.03)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: newPassword.length >= 6 ? '#4ade80' : 'rgba(255,255,255,0.35)' }}>
+                      <span style={{ fontSize: '1.2rem', lineHeight: 0.8 }}>{newPassword.length >= 6 ? '✓' : '•'}</span>
+                      <span>Minimum 6 characters</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: newPassword === confirmNewPassword && confirmNewPassword.length > 0 ? '#4ade80' : 'rgba(255,255,255,0.35)' }}>
+                      <span style={{ fontSize: '1.2rem', lineHeight: 0.8 }}>{newPassword === confirmNewPassword && confirmNewPassword.length > 0 ? '✓' : '•'}</span>
+                      <span>Passwords match</span>
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={securityLoading || !currentPassword || newPassword.length < 6 || newPassword !== confirmNewPassword}
+                  style={{
+                    padding: '0.85rem 2rem',
+                    borderRadius: '0.75rem',
+                    background: 'linear-gradient(135deg, var(--accent-primary), #8b5cf6)',
+                    color: 'black',
+                    border: 'none',
+                    cursor: securityLoading || !currentPassword || newPassword.length < 6 || newPassword !== confirmNewPassword ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontWeight: 800,
+                    fontSize: '0.95rem',
+                    boxShadow: '0 4px 15px rgba(245, 158, 11, 0.25)',
+                    transition: 'all 0.3s ease',
+                    opacity: securityLoading || !currentPassword || newPassword.length < 6 || newPassword !== confirmNewPassword ? 0.4 : 1,
+                    marginTop: '0.5rem'
+                  }}
+                >
+                  {securityLoading ? <Loader2 className="animate-spin" size={18} /> : <Shield size={18} />}
+                  {securityLoading ? 'Updating...' : 'Update Password'}
+                </button>
+              </form>
+            )}
           </div>
         )}
 

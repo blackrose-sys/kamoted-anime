@@ -42,12 +42,17 @@ export function ResetPassword() {
                 access_token: accessToken,
                 refresh_token: refreshToken
               });
-              if (!setSessionError && data.session) {
+              if (setSessionError) {
+                setError(`Session error: ${setSessionError.message}`);
+              } else if (data.session) {
                 session = data.session;
               }
-            } catch (e) {
+            } catch (e: any) {
               console.error('Failed to set session from hash:', e);
+              setError(`Session exception: ${e.message || e.toString()}`);
             }
+          } else {
+            setError(`Missing token parameters. (Has access: ${accessToken ? 'yes' : 'no'}, Has refresh: ${refreshToken ? 'yes' : 'no'})`);
           }
         }
       }
@@ -59,7 +64,7 @@ export function ResetPassword() {
         setTimeout(async () => {
           const { data: { currentSession } } = await supabase.auth.getSession() as any;
           if (!currentSession) {
-            setError(`Invalid or expired reset link. (URL: ${window.location.pathname}, Search: ${window.location.search || 'none'}, Hash: ${window.location.hash ? 'present' : 'none'}). Please request a new link.`);
+            setError(prev => prev || `Invalid or expired reset link. (URL: ${window.location.pathname}, Search: ${window.location.search || 'none'}, Hash: ${window.location.hash ? 'present' : 'none'}). Please request a new link.`);
           }
           setChecking(false);
         }, 1000);

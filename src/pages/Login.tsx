@@ -86,6 +86,8 @@ export function Login() {
               <Mail size={18} color="var(--text-secondary)" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }} />
               <input 
                 type="email" 
+                name="email"
+                autoComplete="username"
                 required
                 placeholder="you@example.com"
                 value={email}
@@ -107,6 +109,8 @@ export function Login() {
               <Lock size={18} color="var(--text-secondary)" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }} />
               <input 
                 type={showPassword ? 'text' : 'password'}
+                name="password"
+                autoComplete="current-password"
                 required
                 placeholder="Enter your password"
                 value={password}

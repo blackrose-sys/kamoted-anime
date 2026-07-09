@@ -131,9 +131,14 @@ export function Register() {
     <main className="container fade-in" style={{ flex: 1, padding: '8rem 1.5rem', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
       <div className="glass" style={{ width: '100%', maxWidth: '440px', padding: '2.5rem', borderRadius: '1.25rem', border: '1px solid var(--border-color)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
         <h1 style={{ fontSize: '2rem', fontWeight: 900, marginBottom: '0.25rem', textAlign: 'center' }}>Create Account</h1>
-        <p style={{ color: 'var(--text-secondary)', textAlign: 'center', marginBottom: '2rem', fontSize: '0.875rem' }}>
+        <p style={{ color: 'var(--text-secondary)', textAlign: 'center', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
           Join the kamoted community. We'll send a verification code to your email.
         </p>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', backgroundColor: 'rgba(245, 158, 11, 0.03)', border: '1px solid rgba(245, 158, 11, 0.15)', color: 'var(--text-secondary)', padding: '0.85rem 1rem', borderRadius: '0.75rem', fontSize: '0.8rem', marginBottom: '1.5rem', lineHeight: '1.4' }}>
+          <span>💡</span>
+          <span><strong>Pro Tip:</strong> When submitting, your device (like iOS Keychain or Google Passwords) will offer to save your password. Be sure to select <strong>Save</strong> so you don't forget it!</span>
+        </div>
         
         {error && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#fca5a5', padding: '0.85rem 1rem', borderRadius: '0.75rem', fontSize: '0.85rem', marginBottom: '1.5rem', fontWeight: 600 }}>
@@ -150,6 +155,8 @@ export function Register() {
               <User size={18} color="var(--text-secondary)" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }} />
               <input 
                 type="text" 
+                name="username"
+                autoComplete="username"
                 required
                 placeholder="Choose a username"
                 value={username}
@@ -168,6 +175,8 @@ export function Register() {
               <Mail size={18} color="var(--text-secondary)" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }} />
               <input 
                 type="email" 
+                name="email"
+                autoComplete="email"
                 required
                 placeholder="you@example.com"
                 value={email}
@@ -186,6 +195,8 @@ export function Register() {
               <Lock size={18} color="var(--text-secondary)" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }} />
               <input 
                 type={showPassword ? 'text' : 'password'}
+                name="password"
+                autoComplete="new-password"
                 required
                 placeholder="Min 6 characters"
                 minLength={6}
@@ -208,6 +219,8 @@ export function Register() {
               <Lock size={18} color="var(--text-secondary)" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }} />
               <input 
                 type={showPassword ? 'text' : 'password'}
+                name="confirm-password"
+                autoComplete="new-password"
                 required
                 placeholder="Re-enter password"
                 value={confirmPassword}

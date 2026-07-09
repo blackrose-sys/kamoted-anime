@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { Loader2, Lock, Eye, EyeOff, CheckCircle2, XCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -10,7 +10,42 @@ export function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [checking, setChecking] = useState(true);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Listen to auth state changes to detect PASSWORD_RECOVERY event
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY' || session) {
+        setChecking(false);
+        setError('');
+      }
+    });
+
+    // Check session on mount
+    const checkInitialSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setChecking(false);
+      } else {
+        // Allow a brief delay for Supabase to parse the URL hash
+        setTimeout(async () => {
+          const { data: { currentSession } } = await supabase.auth.getSession() as any;
+          const hasAccessToken = window.location.hash.includes('access_token=') || window.location.search.includes('token=');
+          if (!currentSession && !hasAccessToken) {
+            setError('Invalid or expired reset link. Please request a new password recovery email.');
+          }
+          setChecking(false);
+        }, 1500);
+      }
+    };
+
+    checkInitialSession();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const checks = {
     length: password.length >= 6,
@@ -68,6 +103,17 @@ export function ResetPassword() {
     marginBottom: '0.5rem',
   };
 
+  if (checking) {
+    return (
+      <main className="container fade-in" style={{ flex: 1, padding: '8rem 1.5rem', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <div className="glass" style={{ width: '100%', maxWidth: '440px', padding: '3rem', borderRadius: '1.25rem', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+          <Loader2 className="animate-spin" size={32} color="var(--accent-primary)" />
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Verifying your security token...</p>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="container fade-in" style={{ flex: 1, padding: '8rem 1.5rem', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
       <div className="glass" style={{ width: '100%', maxWidth: '440px', padding: '2.5rem', borderRadius: '1.25rem', border: '1px solid var(--border-color)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
@@ -76,14 +122,17 @@ export function ResetPassword() {
           Please choose a new secure password.
         </p>
 
-        {error && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#fca5a5', padding: '0.85rem 1rem', borderRadius: '0.75rem', fontSize: '0.85rem', marginBottom: '1.5rem', fontWeight: 600 }}>
-            <XCircle size={18} color="#ef4444" style={{ flexShrink: 0 }} />
-            {error}
+        {error ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', alignItems: 'center', textAlign: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#fca5a5', padding: '0.85rem 1rem', borderRadius: '0.75rem', fontSize: '0.85rem', fontWeight: 600 }}>
+              <XCircle size={18} color="#ef4444" style={{ flexShrink: 0 }} />
+              {error}
+            </div>
+            <Link to="/forgot-password" className="btn-primary" style={{ textDecoration: 'none', padding: '0.65rem 1.25rem', fontSize: '0.875rem' }}>
+              Request New Link
+            </Link>
           </div>
-        )}
-
-        {success ? (
+        ) : success ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', textAlign: 'center' }}>
             <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: 'rgba(74, 222, 128, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <CheckCircle2 size={24} color="#4ade80" />

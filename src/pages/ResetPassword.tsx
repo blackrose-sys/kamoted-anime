@@ -24,19 +24,45 @@ export function ResetPassword() {
 
     // Check session on mount
     const checkInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      let { data: { session } } = await supabase.auth.getSession();
+      
+      // Parse hash fragment manually if no active session
+      if (!session) {
+        const hash = window.location.hash;
+        if (hash && hash.includes('access_token=')) {
+          // Remove leading '#' and parse parameters
+          const cleanHash = hash.startsWith('#') ? hash.substring(1) : hash;
+          const params = new URLSearchParams(cleanHash);
+          const accessToken = params.get('access_token');
+          const refreshToken = params.get('refresh_token');
+          
+          if (accessToken && refreshToken) {
+            try {
+              const { data, error: setSessionError } = await supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken
+              });
+              if (!setSessionError && data.session) {
+                session = data.session;
+              }
+            } catch (e) {
+              console.error('Failed to set session from hash:', e);
+            }
+          }
+        }
+      }
+
       if (session) {
         setChecking(false);
       } else {
-        // Allow a brief delay for Supabase to parse the URL hash
+        // Fallback delay to let supabase client finish parsing if it was running concurrently
         setTimeout(async () => {
           const { data: { currentSession } } = await supabase.auth.getSession() as any;
-          const hasAccessToken = window.location.hash.includes('access_token=') || window.location.search.includes('token=');
-          if (!currentSession && !hasAccessToken) {
+          if (!currentSession) {
             setError('Invalid or expired reset link. Please request a new password recovery email.');
           }
           setChecking(false);
-        }, 1500);
+        }, 1000);
       }
     };
 

@@ -30,7 +30,8 @@ export function ForgotPassword() {
 
       setStep('code');
     } catch (err: any) {
-      setError(err.message || 'An error occurred. Please try again.');
+      const msg = err?.message || err?.error_description || err?.msg || (typeof err === 'string' ? err : JSON.stringify(err));
+      setError(msg || 'An error occurred. Please try again.');
     } finally {
       setLoading(false);
     }

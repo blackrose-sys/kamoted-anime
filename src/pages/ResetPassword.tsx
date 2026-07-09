@@ -24,36 +24,41 @@ export function ResetPassword() {
 
     // Check session on mount
     const checkInitialSession = async () => {
+      const hash = window.location.hash;
+      const isRecoveryRequest = hash && hash.includes('access_token=');
+      
+      // Clear any existing session first to avoid resetting the wrong logged-in user's account
+      if (isRecoveryRequest) {
+        await supabase.auth.signOut();
+      }
+
       let { data: { session } } = await supabase.auth.getSession();
       
-      // Parse hash fragment manually if no active session
-      if (!session) {
-        const hash = window.location.hash;
-        if (hash && hash.includes('access_token=')) {
-          // Remove leading '#' and parse parameters
-          const cleanHash = hash.startsWith('#') ? hash.substring(1) : hash;
-          const params = new URLSearchParams(cleanHash);
-          const accessToken = params.get('access_token');
-          const refreshToken = params.get('refresh_token');
-          
-          if (accessToken && refreshToken) {
-            try {
-              const { data, error: setSessionError } = await supabase.auth.setSession({
-                access_token: accessToken,
-                refresh_token: refreshToken
-              });
-              if (setSessionError) {
-                setError(`Session error: ${setSessionError.message}`);
-              } else if (data.session) {
-                session = data.session;
-              }
-            } catch (e: any) {
-              console.error('Failed to set session from hash:', e);
-              setError(`Session exception: ${e.message || e.toString()}`);
+      // Parse hash fragment manually
+      if (!session && isRecoveryRequest) {
+        // Remove leading '#' and parse parameters
+        const cleanHash = hash.startsWith('#') ? hash.substring(1) : hash;
+        const params = new URLSearchParams(cleanHash);
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
+        
+        if (accessToken && refreshToken) {
+          try {
+            const { data, error: setSessionError } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken
+            });
+            if (setSessionError) {
+              setError('This reset link has expired or already been used. Please request a new one.');
+            } else if (data.session) {
+              session = data.session;
             }
-          } else {
-            setError(`Missing token parameters. (Has access: ${accessToken ? 'yes' : 'no'}, Has refresh: ${refreshToken ? 'yes' : 'no'})`);
+          } catch (e: any) {
+            console.error('Failed to set session from hash:', e);
+            setError('Something went wrong verifying your reset link. Please request a new one.');
           }
+        } else {
+          setError('This reset link appears to be incomplete. Please request a new one.');
         }
       }
 
@@ -64,7 +69,7 @@ export function ResetPassword() {
         setTimeout(async () => {
           const { data: { currentSession } } = await supabase.auth.getSession() as any;
           if (!currentSession) {
-            setError(prev => prev || `Invalid or expired reset link. (URL: ${window.location.pathname}, Search: ${window.location.search || 'none'}, Hash: ${window.location.hash ? 'present' : 'none'}). Please request a new link.`);
+            setError(prev => prev || 'Invalid or expired reset link. Please request a new password recovery email.');
           }
           setChecking(false);
         }, 1000);

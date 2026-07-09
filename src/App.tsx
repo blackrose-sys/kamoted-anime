@@ -9,6 +9,8 @@ import { Register } from './pages/Register';
 import { Verify } from './pages/Verify';
 import { Profile } from './pages/Profile';
 import { UserProfile } from './pages/UserProfile';
+import { ForgotPassword } from './pages/ForgotPassword';
+import { ResetPassword } from './pages/ResetPassword';
 import { Calendar } from './pages/Calendar';
 import { News } from './pages/News';
 import { WatchRoom } from './pages/WatchRoom';
@@ -81,6 +83,8 @@ function App() {
             <Route path="/verify" element={<Verify />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/user/:username" element={<UserProfile />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/news" element={<News />} />
             <Route path="/lists" element={<Lists />} />

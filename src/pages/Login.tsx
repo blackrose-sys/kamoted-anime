@@ -99,7 +99,10 @@ export function Login() {
           
           {/* Password */}
           <div>
-            <label style={labelStyle}>Password</label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label style={labelStyle}>Password</label>
+              <Link to="/forgot-password" style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-primary)', textDecoration: 'none', marginBottom: '0.5rem' }} className="hover-scale">Forgot Password?</Link>
+            </div>
             <div style={{ position: 'relative' }}>
               <Lock size={18} color="var(--text-secondary)" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }} />
               <input 

@@ -59,7 +59,7 @@ export function ResetPassword() {
         setTimeout(async () => {
           const { data: { currentSession } } = await supabase.auth.getSession() as any;
           if (!currentSession) {
-            setError('Invalid or expired reset link. Please request a new password recovery email.');
+            setError(`Invalid or expired reset link. (URL: ${window.location.pathname}, Search: ${window.location.search || 'none'}, Hash: ${window.location.hash ? 'present' : 'none'}). Please request a new link.`);
           }
           setChecking(false);
         }, 1000);

@@ -14,74 +14,44 @@ export function ResetPassword() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Listen to auth state changes to detect PASSWORD_RECOVERY event
+    let resolved = false;
+
+    // The Supabase JS client automatically parses the #access_token hash fragment
+    // and fires a PASSWORD_RECOVERY event. We just need to listen for it.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY' || session) {
+      if (resolved) return;
+      if (event === 'PASSWORD_RECOVERY' && session) {
+        resolved = true;
         setChecking(false);
         setError('');
       }
     });
 
-    // Check session on mount
-    const checkInitialSession = async () => {
-      const hash = window.location.hash;
-      const isRecoveryRequest = hash && hash.includes('access_token=');
-      
-      // Clear any existing session first to avoid resetting the wrong logged-in user's account
-      if (isRecoveryRequest) {
-        await supabase.auth.signOut();
-      }
+    // Also check if there's already an active session (e.g. Supabase parsed the hash before this component mounted)
+    const checkExistingSession = async () => {
+      // Give Supabase client a moment to process the hash fragment
+      await new Promise(r => setTimeout(r, 2000));
+      if (resolved) return; // Already handled by onAuthStateChange
 
-      let { data: { session } } = await supabase.auth.getSession();
-      
-      // Parse hash fragment manually
-      if (!session && isRecoveryRequest) {
-        // Remove leading '#' and parse parameters
-        const cleanHash = hash.startsWith('#') ? hash.substring(1) : hash;
-        const params = new URLSearchParams(cleanHash);
-        const accessToken = params.get('access_token');
-        const refreshToken = params.get('refresh_token');
-        
-        if (accessToken && refreshToken) {
-          try {
-            const { data, error: setSessionError } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken
-            });
-            if (setSessionError) {
-              setError('This reset link has expired or already been used. Please request a new one.');
-            } else if (data.session) {
-              session = data.session;
-            }
-          } catch (e: any) {
-            console.error('Failed to set session from hash:', e);
-            setError('Something went wrong verifying your reset link. Please request a new one.');
-          }
-        } else {
-          setError('This reset link appears to be incomplete. Please request a new one.');
-        }
-      }
-
+      const { data: { session } } = await supabase.auth.getSession();
       if (session) {
+        resolved = true;
         setChecking(false);
+        setError('');
       } else {
-        // Fallback delay to let supabase client finish parsing if it was running concurrently
-        setTimeout(async () => {
-          const { data: { currentSession } } = await supabase.auth.getSession() as any;
-          if (!currentSession) {
-            setError(prev => prev || 'Invalid or expired reset link. Please request a new password recovery email.');
-          }
-          setChecking(false);
-        }, 1000);
+        setError('Invalid or expired reset link. Please request a new password recovery email.');
+        setChecking(false);
       }
     };
 
-    checkInitialSession();
+    checkExistingSession();
 
     return () => {
       subscription.unsubscribe();
     };
   }, []);
+
+
 
   const checks = {
     length: password.length >= 6,

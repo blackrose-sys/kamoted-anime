@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { UserBadge } from './UserBadge';
+import { NotificationCenter } from './NotificationCenter';
 
 // Discord SVG icon (official shape)
 function DiscordIcon({ size = 16 }: { size?: number }) {
@@ -156,7 +157,9 @@ export function Navbar() {
 
             {/* User menu / Sign In */}
             {user ? (
-              <div style={{ position: 'relative' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <NotificationCenter />
+                <div style={{ position: 'relative' }}>
                 <button
                   onClick={() => setShowDropdown(!showDropdown)}
                   style={{
@@ -228,6 +231,7 @@ export function Navbar() {
                     </button>
                   </div>
                 )}
+              </div>
               </div>
             ) : (
               <Link

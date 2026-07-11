@@ -449,3 +449,48 @@ DROP POLICY IF EXISTS "Anyone can upload media" ON storage.objects;
 CREATE POLICY "Anyone can upload media" 
 ON storage.objects FOR INSERT 
 WITH CHECK (bucket_id = 'chat-media');
+
+-- ===================================================
+-- 11. Create Notifications Table
+-- ===================================================
+CREATE TABLE IF NOT EXISTS public.notifications (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  from_user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  from_username TEXT NOT NULL,
+  from_avatar_url TEXT,
+  type TEXT NOT NULL,
+  message TEXT NOT NULL,
+  link TEXT,
+  is_read BOOLEAN DEFAULT false NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+
+-- Enable RLS
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
+-- Enable Realtime for notifications
+ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+
+-- RLS Policies
+DROP POLICY IF EXISTS "Users can view their own notifications" ON public.notifications;
+CREATE POLICY "Users can view their own notifications" 
+ON public.notifications FOR SELECT 
+USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can update their own notifications" ON public.notifications;
+CREATE POLICY "Users can update their own notifications" 
+ON public.notifications FOR UPDATE 
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can delete their own notifications" ON public.notifications;
+CREATE POLICY "Users can delete their own notifications" 
+ON public.notifications FOR DELETE 
+USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Anyone can insert notifications" ON public.notifications;
+CREATE POLICY "Anyone can insert notifications" 
+ON public.notifications FOR INSERT 
+WITH CHECK (true);
+

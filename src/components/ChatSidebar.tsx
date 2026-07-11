@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { MessageCircle, X, Send, Loader2, ChevronDown, Trash2, ExternalLink, Users, Monitor, Smartphone, ImagePlus } from 'lucide-react';
+import { MessageCircle, X, Send, Loader2, ChevronDown, Trash2, ExternalLink, Users, Monitor, Smartphone, ImagePlus, AtSign } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { UserBadge } from './UserBadge';
@@ -116,7 +116,6 @@ export function ChatSidebar() {
   const [isMeTyping, setIsMeTyping] = useState(false);
   const channelRef = useRef<any>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   // Media upload
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
@@ -124,10 +123,64 @@ export function ChatSidebar() {
 
   const MAX_CHARS = 500;
 
-  // ── Real-time profile cache: always shows latest avatar/username ──
+  // Real-time profile cache: always shows latest avatar/username
   const profileUserIds = messages.map(m => m.user_id);
   const profileCache = useProfileCache(profileUserIds);
 
+  // Mention system
+  const [mentionSuggestions, setMentionSuggestions] = useState<{uid: string; username: string; avatar_url: string | null}[]>([]);
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+  const [mentionSelectedIdx, setMentionSelectedIdx] = useState(0);
+
+  const getMentionableUsers = useCallback(() => {
+    const userMap = new Map<string, {uid: string; username: string; avatar_url: string | null}>();
+    onlineUsers.forEach(u => {
+      if (u.uid !== user?.id) userMap.set(u.uid, { uid: u.uid, username: u.username, avatar_url: u.avatar_url });
+    });
+    messages.forEach(m => {
+      if (m.user_id !== user?.id && !userMap.has(m.user_id)) {
+        userMap.set(m.user_id, { uid: m.user_id, username: resolveUsername(profileCache, m.user_id, m.username), avatar_url: resolveAvatar(profileCache, m.user_id, m.avatar_url) });
+      }
+    });
+    return Array.from(userMap.values());
+  }, [onlineUsers, messages, user, profileCache]);
+
+  const selectMention = (username: string) => {
+    const lastAtIdx = input.lastIndexOf('@');
+    if (lastAtIdx !== -1) {
+      const before = input.substring(0, lastAtIdx);
+      setInput(`${before}@${username} `);
+    }
+    setShowMentionDropdown(false);
+    setMentionSelectedIdx(0);
+    inputRef.current?.focus();
+  };
+
+  const renderMessageContent = (text: string) => {
+    const parts = text.split(/(@\w+)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith('@')) {
+        const uname = part.substring(1);
+        return (
+          <span
+            key={i}
+            onClick={(e) => { e.stopPropagation(); navigate(`/user/${uname}`); }}
+            style={{
+              color: '#a78bfa', fontWeight: 700, cursor: 'pointer',
+              backgroundColor: 'rgba(167,139,250,0.1)',
+              padding: '0 3px', borderRadius: '3px',
+              transition: 'background 0.15s'
+            }}
+            onMouseOver={e => (e.currentTarget as HTMLSpanElement).style.backgroundColor = 'rgba(167,139,250,0.22)'}
+            onMouseOut={e => (e.currentTarget as HTMLSpanElement).style.backgroundColor = 'rgba(167,139,250,0.1)'}
+          >
+            {part}
+          </span>
+        );
+      }
+      return <span key={i}>{part}</span>;
+    });
+  };
   const broadcastTyping = useCallback((typingState: boolean) => {
     if (!user || !channelRef.current) return;
     channelRef.current.send({
@@ -144,6 +197,29 @@ export function ChatSidebar() {
   const handleInputChange = (val: string) => {
     setInput(val);
     if (!user) return;
+
+    // Mention detection
+    const lastAtIdx = val.lastIndexOf('@');
+    if (lastAtIdx !== -1) {
+      const afterAt = val.substring(lastAtIdx + 1);
+      if (!afterAt.includes(' ') && afterAt.length <= 20) {
+        const query = afterAt.toLowerCase();
+        const candidates = getMentionableUsers().filter(u =>
+          u.username.toLowerCase().startsWith(query)
+        ).slice(0, 6);
+        if (candidates.length > 0) {
+          setMentionSuggestions(candidates);
+          setShowMentionDropdown(true);
+          setMentionSelectedIdx(0);
+        } else {
+          setShowMentionDropdown(false);
+        }
+      } else {
+        setShowMentionDropdown(false);
+      }
+    } else {
+      setShowMentionDropdown(false);
+    }
 
     if (!isMeTyping && val.trim().length > 0) {
       setIsMeTyping(true);
@@ -451,6 +527,37 @@ export function ChatSidebar() {
       if (error) throw error;
       
       removeMedia();
+
+      // Create notifications for @mentions
+      const mentionRegex = /@(\w+)/g;
+      const mentionedUsernames: string[] = [];
+      let match;
+      while ((match = mentionRegex.exec(text)) !== null) {
+        if (!mentionedUsernames.includes(match[1])) mentionedUsernames.push(match[1]);
+      }
+      if (mentionedUsernames.length > 0) {
+        try {
+          const { data: mentionedProfiles } = await supabase
+            .from('profiles')
+            .select('id, username')
+            .in('username', mentionedUsernames);
+          if (mentionedProfiles) {
+            for (const profile of mentionedProfiles) {
+              if (profile.id !== user.id) {
+                await supabase.from('notifications').insert({
+                  user_id: profile.id,
+                  from_user_id: user.id,
+                  from_username: user.username,
+                  from_avatar_url: user.avatar_url,
+                  type: 'mention',
+                  message: 'mentioned you in community chat',
+                  is_read: false
+                }).then(() => {});
+              }
+            }
+          }
+        } catch { /* ignore notification errors */ }
+      }
     } catch (err) {
       console.error('Failed to send:', err);
       alert('Failed to send message: ' + ((err as Error).message || JSON.stringify(err)));
@@ -541,6 +648,12 @@ export function ChatSidebar() {
 
   /* ─── Keyboard ─── */
   const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (showMentionDropdown && mentionSuggestions.length > 0) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); setMentionSelectedIdx(p => (p + 1) % mentionSuggestions.length); return; }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setMentionSelectedIdx(p => (p - 1 + mentionSuggestions.length) % mentionSuggestions.length); return; }
+      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); selectMention(mentionSuggestions[mentionSelectedIdx].username); return; }
+      if (e.key === 'Escape') { e.preventDefault(); setShowMentionDropdown(false); return; }
+    }
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
     if (e.key === 'Escape') setIsOpen(false);
   };
@@ -822,7 +935,7 @@ export function ChatSidebar() {
                             </div>
                           )}
                           {msg.message.trim() !== '' && (
-                            <div>{msg.message}</div>
+                            <div>{renderMessageContent(msg.message)}</div>
                           )}
                         </div>
                       </div>
@@ -965,10 +1078,45 @@ export function ChatSidebar() {
             borderTop: '1px solid rgba(255,255,255,0.06)',
             padding: '0.75rem 1rem',
             backgroundColor: 'rgba(0,0,0,0.25)',
-            borderRadius: '0 0 1.5rem 1.5rem', flexShrink: 0
+            borderRadius: '0 0 1.5rem 1.5rem', flexShrink: 0,
+            position: 'relative'
           }}>
             {user ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                {/* @Mention Dropdown */}
+                {showMentionDropdown && mentionSuggestions.length > 0 && (
+                  <div className="fade-in" style={{
+                    position: 'absolute', bottom: '100%', left: 0, right: 0,
+                    marginBottom: 4,
+                    backgroundColor: 'rgba(10,10,18,0.99)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '0.75rem',
+                    boxShadow: '0 -8px 24px rgba(0,0,0,0.5)',
+                    overflow: 'hidden', zIndex: 20
+                  }}>
+                    <div style={{ padding: '0.35rem 0.65rem', fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <AtSign size={9} /> Mention a user
+                    </div>
+                    {mentionSuggestions.map((u, idx) => (
+                      <button
+                        key={u.uid}
+                        onClick={() => selectMention(u.username)}
+                        onMouseEnter={() => setMentionSelectedIdx(idx)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '0.5rem',
+                          width: '100%', padding: '0.45rem 0.65rem',
+                          background: idx === mentionSelectedIdx ? 'rgba(245,158,11,0.08)' : 'transparent',
+                          border: 'none', cursor: 'pointer', color: 'white',
+                          fontSize: '0.82rem', transition: 'background 0.1s',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <UserAvatar username={u.username} avatarUrl={u.avatar_url} size={22} />
+                        <span style={{ fontWeight: 700 }}>@{u.username}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {mediaPreview && (
                   <div style={{ position: 'relative', width: 'max-content', marginBottom: '0.4rem' }}>
                     <img src={mediaPreview} alt="preview" style={{ height: '80px', borderRadius: '0.5rem', objectFit: 'contain', backgroundColor: 'rgba(0,0,0,0.2)' }} />

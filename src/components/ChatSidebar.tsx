@@ -953,10 +953,12 @@ export function ChatSidebar() {
                         <div
                           className="fade-in"
                           onClick={e => e.stopPropagation()}
+                          onMouseEnter={() => showBar(msg.id)}
+                          onMouseLeave={hideBar}
                           style={{
                             position: 'absolute',
-                            [isMe ? 'right' : 'left']: 'calc(100% + 8px)',
-                            bottom: '0',
+                            [isMe ? 'right' : 'left']: isMe ? '12px' : '42px',
+                            bottom: 'calc(100% - 4px)',
                             display: 'flex', alignItems: 'center', gap: '0.35rem',
                             backgroundColor: 'rgba(15,15,22,0.96)',
                             border: '1px solid rgba(255,255,255,0.08)',

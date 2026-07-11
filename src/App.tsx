@@ -67,11 +67,14 @@ function MobileNativeBridge() {
   return null;
 }
 
+import { EpisodeNotificationWatcher } from './components/EpisodeNotificationWatcher';
+
 function App() {
   return (
     <AuthProvider>
       <Router>
         <MobileNativeBridge />
+        <EpisodeNotificationWatcher />
         <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
           <Navbar />
           <Routes>

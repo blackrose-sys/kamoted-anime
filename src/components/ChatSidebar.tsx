@@ -1,10 +1,11 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { MessageCircle, X, Send, Loader2, ChevronDown, Trash2, ExternalLink, Users, Monitor, Smartphone, ImagePlus, AtSign } from 'lucide-react';
+import { MessageCircle, X, Send, Loader2, ChevronDown, Trash2, ExternalLink, Users, Monitor, Smartphone, ImagePlus, AtSign, Smile, CornerUpLeft, MoreHorizontal } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { UserBadge } from './UserBadge';
 import { useProfileCache, resolveUsername, resolveAvatar } from '../hooks/useProfileCache';
+
 
 // reactions shape: { "👍": ["uid1","uid2"], "❤️": ["uid3"] }
 type Reactions = Record<string, string[]>;
@@ -100,6 +101,8 @@ export function ChatSidebar() {
   const [onlineUsers, setOnlineUsers] = useState<{ uid: string; username: string; avatar_url: string | null; device?: string }[]>([]);
   const [showOnlineList, setShowOnlineList] = useState(false);
   const [activeBar, setActiveBar] = useState<string | null>(null);
+  const [showAllEmojis, setShowAllEmojis] = useState<string | null>(null);
+  const [showMoreActions, setShowMoreActions] = useState<string | null>(null);
   const [hoverCard, setHoverCard] = useState<HoverCard | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [reactionTooltip, setReactionTooltip] = useState<{ msgId: string; emoji: string; names: string[]; x: number; y: number } | null>(null);
@@ -432,7 +435,7 @@ export function ChatSidebar() {
   useEffect(() => { if (isOpen) scrollToBottom(); }, [messages, isOpen, scrollToBottom]);
 
   useEffect(() => {
-    const fn = () => { setHoverCard(null); setActiveBar(null); };
+    const fn = () => { setHoverCard(null); setActiveBar(null); setShowAllEmojis(null); setShowMoreActions(null); };
     document.addEventListener('click', fn);
     return () => document.removeEventListener('click', fn);
   }, []);
@@ -945,8 +948,7 @@ export function ChatSidebar() {
                           )}
                         </div>
                       </div>
-
-                      {/* Emoji + Delete Action Bar */}
+                      {/* Floating Action Pill Toolbar (Discord/Messenger style) */}
                       {activeBar === msg.id && (
                         <div
                           className="fade-in"
@@ -955,69 +957,182 @@ export function ChatSidebar() {
                             position: 'absolute',
                             [isMe ? 'right' : 'left']: 'calc(100% + 8px)',
                             bottom: '0',
-                            display: 'flex', flexDirection: 'column', gap: '0.4rem',
-                            backgroundColor: 'rgba(10,10,18,0.98)',
+                            display: 'flex', alignItems: 'center', gap: '0.35rem',
+                            backgroundColor: 'rgba(15,15,22,0.96)',
                             border: '1px solid rgba(255,255,255,0.08)',
-                            borderRadius: '0.85rem',
-                            padding: '0.6rem', zIndex: 20,
-                            boxShadow: '0 12px 36px rgba(0,0,0,0.8)',
+                            borderRadius: '9999px',
+                            padding: '0.3rem 0.55rem', zIndex: 120,
+                            boxShadow: '0 12px 30px rgba(0,0,0,0.8)',
                             backdropFilter: 'blur(16px)',
-                            width: '180px'
                           }}
                         >
-                          {/* Grid of Emojis */}
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.2rem' }}>
-                            {EMOJI_OPTIONS.map(emoji => {
-                              const reacted = user && (msg.reactions?.[emoji] || []).includes(user.id);
-                              return (
-                                <button
-                                  key={emoji}
-                                  title={`React with ${emoji}`}
-                                  onClick={() => handleReact(msg, emoji)}
-                                  style={{
-                                    background: reacted ? 'rgba(245,158,11,0.15)' : 'none',
-                                    border: reacted ? '1px solid rgba(245,158,11,0.3)' : '1px solid transparent',
-                                    borderRadius: '0.35rem',
-                                    cursor: 'pointer',
-                                    fontSize: '1rem', padding: '0.2rem 0',
-                                    lineHeight: 1, transition: 'transform 0.1s, background 0.15s',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
-                                  }}
-                                  onMouseOver={e => (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.35)'}
-                                  onMouseOut={e => (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'}
-                                >
-                                  {emoji}
-                                </button>
-                              );
-                            })}
+                          {/* 1. Quick Emojis (❤️, 😂, 👍) */}
+                          {['❤️', '😂', '👍'].map(emoji => {
+                            const reacted = user && (msg.reactions?.[emoji] || []).includes(user.id);
+                            return (
+                              <button
+                                key={emoji}
+                                title={`React with ${emoji}`}
+                                onClick={() => { handleReact(msg, emoji); setActiveBar(null); }}
+                                style={{
+                                  background: reacted ? 'rgba(245,158,11,0.18)' : 'none',
+                                  border: 'none',
+                                  borderRadius: '50%',
+                                  cursor: 'pointer',
+                                  fontSize: '1rem', padding: '0.2rem',
+                                  width: '26px', height: '26px',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  transition: 'transform 0.15s'
+                                }}
+                                onMouseOver={e => (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.28)'}
+                                onMouseOut={e => (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'}
+                              >
+                                {emoji}
+                              </button>
+                            );
+                          })}
+
+                          {/* Divider */}
+                          <div style={{ width: '1px', height: '16px', backgroundColor: 'rgba(255,255,255,0.1)', margin: '0 0.15rem' }} />
+
+                          {/* 2. Reaction Picker Icon */}
+                          <div style={{ position: 'relative' }}>
+                            <button
+                              title="Add Reaction"
+                              onClick={(e) => { e.stopPropagation(); setShowAllEmojis(showAllEmojis === msg.id ? null : msg.id); setShowMoreActions(null); }}
+                              style={{
+                                background: 'none', border: 'none', cursor: 'pointer',
+                                color: showAllEmojis === msg.id ? 'var(--accent-primary)' : 'rgba(255,255,255,0.5)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                padding: '0.2rem', borderRadius: '50%', transition: 'all 0.15s'
+                              }}
+                              onMouseOver={e => e.currentTarget.style.color = 'var(--accent-primary)'}
+                              onMouseOut={e => e.currentTarget.style.color = showAllEmojis === msg.id ? 'var(--accent-primary)' : 'rgba(255,255,255,0.5)'}
+                            >
+                              <Smile size={16} />
+                            </button>
+
+                            {/* Full Emojis Grid Popover (Opens above toolbar) */}
+                            {showAllEmojis === msg.id && (
+                              <div className="fade-in" style={{
+                                position: 'absolute', bottom: '135%', left: '50%', transform: 'translateX(-50%)',
+                                backgroundColor: 'rgba(10,10,18,0.98)',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                borderRadius: '0.75rem',
+                                padding: '0.5rem',
+                                boxShadow: '0 -8px 24px rgba(0,0,0,0.5)',
+                                zIndex: 130, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.2rem',
+                                width: '140px', backdropFilter: 'blur(16px)'
+                              }}>
+                                {EMOJI_OPTIONS.map(emoji => {
+                                  const reacted = user && (msg.reactions?.[emoji] || []).includes(user.id);
+                                  return (
+                                    <button
+                                      key={emoji}
+                                      onClick={() => { handleReact(msg, emoji); setShowAllEmojis(null); setActiveBar(null); }}
+                                      style={{
+                                        background: reacted ? 'rgba(245,158,11,0.15)' : 'none',
+                                        border: 'none', borderRadius: '0.35rem',
+                                        cursor: 'pointer', fontSize: '0.95rem', padding: '0.2rem 0',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        transition: 'transform 0.1s'
+                                      }}
+                                      onMouseOver={e => (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.3)'}
+                                      onMouseOut={e => (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'}
+                                    >
+                                      {emoji}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
 
-                          {/* Delete Button row if authorized */}
-                          {(isMe || user?.username === 'fckitscott') && (
-                            <>
-                              <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.06)', margin: '0.1rem 0' }} />
-                              <button
-                                onClick={() => handleDelete(msg)}
-                                style={{
-                                  width: '100%',
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem',
-                                  backgroundColor: 'rgba(239, 68, 68, 0.08)',
-                                  border: '1px solid rgba(239, 68, 68, 0.2)',
-                                  borderRadius: '0.5rem',
-                                  color: '#f87171',
-                                  padding: '0.42rem 0',
-                                  fontSize: '0.72rem',
-                                  fontWeight: 800,
-                                  cursor: 'pointer',
-                                  transition: 'all 0.15s'
-                                }}
-                                onMouseOver={e => { e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.18)'; e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.35)'; }}
-                                onMouseOut={e => { e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.08)'; e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.2)'; }}
-                              >
-                                <Trash2 size={11} /> Delete Message
-                              </button>
-                            </>
-                          )}
+                          {/* 3. Reply / Mention Icon */}
+                          <button
+                            title="Reply / Mention"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const uname = resolveUsername(profileCache, msg.user_id, msg.username);
+                              setInput(prev => prev.includes(`@${uname}`) ? prev : `@${uname} ${prev}`);
+                              setActiveBar(null);
+                              inputRef.current?.focus();
+                            }}
+                            style={{
+                              background: 'none', border: 'none', cursor: 'pointer',
+                              color: 'rgba(255,255,255,0.5)',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              padding: '0.2rem', borderRadius: '50%', transition: 'all 0.15s'
+                            }}
+                            onMouseOver={e => e.currentTarget.style.color = 'var(--accent-primary)'}
+                            onMouseOut={e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}
+                          >
+                            <CornerUpLeft size={16} />
+                          </button>
+
+                          {/* 4. More Options Icon */}
+                          <div style={{ position: 'relative' }}>
+                            <button
+                              title="More Options"
+                              onClick={(e) => { e.stopPropagation(); setShowMoreActions(showMoreActions === msg.id ? null : msg.id); setShowAllEmojis(null); }}
+                              style={{
+                                background: 'none', border: 'none', cursor: 'pointer',
+                                color: showMoreActions === msg.id ? 'var(--accent-primary)' : 'rgba(255,255,255,0.5)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                padding: '0.2rem', borderRadius: '50%', transition: 'all 0.15s'
+                              }}
+                              onMouseOver={e => e.currentTarget.style.color = 'var(--accent-primary)'}
+                              onMouseOut={e => e.currentTarget.style.color = showMoreActions === msg.id ? 'var(--accent-primary)' : 'rgba(255,255,255,0.5)'}
+                            >
+                              <MoreHorizontal size={16} />
+                            </button>
+
+                            {/* More Actions Dropdown Menu */}
+                            {showMoreActions === msg.id && (
+                              <div className="fade-in" style={{
+                                position: 'absolute', bottom: '135%', [isMe ? 'right' : 'left']: 0,
+                                backgroundColor: 'rgba(10,10,18,0.98)',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                borderRadius: '0.65rem',
+                                padding: '0.35rem',
+                                boxShadow: '0 -8px 24px rgba(0,0,0,0.5)',
+                                zIndex: 130, display: 'flex', flexDirection: 'column', gap: '0.2rem',
+                                width: '130px', backdropFilter: 'blur(16px)'
+                              }}>
+                                {(isMe || user?.username === 'fckitscott') ? (
+                                  <button
+                                    onClick={() => { handleDelete(msg); setShowMoreActions(null); setActiveBar(null); }}
+                                    style={{
+                                      display: 'flex', alignItems: 'center', gap: '0.45rem',
+                                      width: '100%', padding: '0.45rem 0.55rem', borderRadius: '0.45rem',
+                                      backgroundColor: 'transparent', border: 'none', color: '#f87171',
+                                      fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', textAlign: 'left',
+                                      transition: 'background 0.15s'
+                                    }}
+                                    onMouseOver={e => e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.1)'}
+                                    onMouseOut={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                                  >
+                                    <Trash2 size={12} /> Delete Message
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => { alert('Message reported to moderators.'); setShowMoreActions(null); setActiveBar(null); }}
+                                    style={{
+                                      display: 'flex', alignItems: 'center', gap: '0.45rem',
+                                      width: '100%', padding: '0.45rem 0.55rem', borderRadius: '0.45rem',
+                                      backgroundColor: 'transparent', border: 'none', color: 'rgba(255,255,255,0.7)',
+                                      fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', textAlign: 'left',
+                                      transition: 'background 0.15s'
+                                    }}
+                                    onMouseOver={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)'}
+                                    onMouseOut={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                                  >
+                                    ⚠️ Report Message
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>

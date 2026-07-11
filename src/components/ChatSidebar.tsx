@@ -29,7 +29,7 @@ interface HoverCard {
   y: number;
 }
 
-const EMOJI_OPTIONS = ['👍', '❤️', '😂', '😮', '😭', '🔥', '🎉', '😍'];
+const EMOJI_OPTIONS = ['👍', '❤️', '😂', '😮', '😭', '🔥', '🎉', '😍', '👀', '💯', '✨', '💀', '🤡', '👏', '💖', '🤔'];
 
 function getInitial(name: string) {
   return name?.charAt(0).toUpperCase() || '?';
@@ -432,7 +432,7 @@ export function ChatSidebar() {
   useEffect(() => { if (isOpen) scrollToBottom(); }, [messages, isOpen, scrollToBottom]);
 
   useEffect(() => {
-    const fn = () => { setHoverCard(null); };
+    const fn = () => { setHoverCard(null); setActiveBar(null); };
     document.addEventListener('click', fn);
     return () => document.removeEventListener('click', fn);
   }, []);
@@ -913,16 +913,22 @@ export function ChatSidebar() {
                           </div>
                         )}
 
-                        <div style={{
-                          display: 'flex', flexDirection: 'column', gap: '0.4rem',
-                          padding: (msg.message.trim() === '' && msg.media_url) ? '0' : '0.52rem 0.82rem',
-                          borderRadius: isMe
-                            ? (grouped ? '1.1rem 0.35rem 0.35rem 1.1rem' : '1.1rem 0.35rem 1.1rem 1.1rem')
-                            : (grouped ? '0.35rem 1.1rem 1.1rem 0.35rem' : '0.35rem 1.1rem 1.1rem 1.1rem'),
-                          backgroundColor: (msg.message.trim() === '' && msg.media_url) ? 'transparent' : (isMe ? 'rgba(245,158,11,0.13)' : 'rgba(255,255,255,0.055)'),
-                          border: (msg.message.trim() === '' && msg.media_url) ? 'none' : `1px solid ${isMe ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.065)'}`,
-                          fontSize: '0.83rem', lineHeight: 1.5, wordBreak: 'break-word', overflow: 'hidden'
-                        }}>
+                        <div 
+                          onClick={(e) => { e.stopPropagation(); setActiveBar(activeBar === msg.id ? null : msg.id); }}
+                          style={{
+                            display: 'flex', flexDirection: 'column', gap: '0.4rem',
+                            padding: (msg.message.trim() === '' && msg.media_url) ? '0' : '0.52rem 0.82rem',
+                            borderRadius: isMe
+                              ? (grouped ? '1.1rem 0.35rem 0.35rem 1.1rem' : '1.1rem 0.35rem 1.1rem 1.1rem')
+                              : (grouped ? '0.35rem 1.1rem 1.1rem 0.35rem' : '0.35rem 1.1rem 1.1rem 1.1rem'),
+                            backgroundColor: (msg.message.trim() === '' && msg.media_url) ? 'transparent' : (isMe ? 'rgba(245,158,11,0.13)' : 'rgba(255,255,255,0.055)'),
+                            border: (msg.message.trim() === '' && msg.media_url) ? 'none' : `1px solid ${isMe ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.065)'}`,
+                            fontSize: '0.83rem', lineHeight: 1.5, wordBreak: 'break-word', overflow: 'hidden',
+                            cursor: 'pointer', transition: 'transform 0.1s'
+                          }}
+                          onMouseOver={e => { e.currentTarget.style.transform = 'scale(1.01)'; }}
+                          onMouseOut={e => { e.currentTarget.style.transform = 'scale(1)'; }}
+                        >
                           {msg.media_url && (
                             <div style={{ borderRadius: '0.5rem', overflow: 'hidden', maxWidth: '240px' }}>
                                 <a href={msg.media_url} target="_blank" rel="noopener noreferrer">
@@ -945,58 +951,70 @@ export function ChatSidebar() {
                         <div
                           className="fade-in"
                           onClick={e => e.stopPropagation()}
-                          onMouseEnter={() => showBar(msg.id)}
-                          onMouseLeave={hideBar}
                           style={{
                             position: 'absolute',
-                            [isMe ? 'left' : 'right']: 34,
-                            bottom: '100%', marginBottom: 6,
-                            display: 'flex', alignItems: 'center', gap: '0.15rem',
-                            backgroundColor: 'rgba(12,12,20,0.99)',
-                            border: '1px solid rgba(255,255,255,0.09)',
-                            borderRadius: 9999,
-                            padding: '0.3rem 0.55rem', zIndex: 20,
-                            boxShadow: '0 10px 30px rgba(0,0,0,0.7)'
+                            [isMe ? 'right' : 'left']: 'calc(100% + 8px)',
+                            bottom: '0',
+                            display: 'flex', flexDirection: 'column', gap: '0.4rem',
+                            backgroundColor: 'rgba(10,10,18,0.98)',
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            borderRadius: '0.85rem',
+                            padding: '0.6rem', zIndex: 20,
+                            boxShadow: '0 12px 36px rgba(0,0,0,0.8)',
+                            backdropFilter: 'blur(16px)',
+                            width: '180px'
                           }}
                         >
-                          {EMOJI_OPTIONS.map(emoji => {
-                            const reacted = user && (msg.reactions?.[emoji] || []).includes(user.id);
-                            return (
-                              <button
-                                key={emoji}
-                                title={`React with ${emoji}`}
-                                onClick={() => handleReact(msg, emoji)}
-                                style={{
-                                  background: reacted ? 'rgba(245,158,11,0.15)' : 'none',
-                                  border: reacted ? '1px solid rgba(245,158,11,0.3)' : '1px solid transparent',
-                                  borderRadius: '0.35rem',
-                                  cursor: 'pointer',
-                                  fontSize: '1rem', padding: '0.1rem 0.18rem',
-                                  lineHeight: 1, transition: 'transform 0.1s, background 0.15s'
-                                }}
-                                onMouseOver={e => (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.4)'}
-                                onMouseOut={e => (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'}
-                              >
-                                {emoji}
-                              </button>
-                            );
-                          })}
+                          {/* Grid of Emojis */}
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.2rem' }}>
+                            {EMOJI_OPTIONS.map(emoji => {
+                              const reacted = user && (msg.reactions?.[emoji] || []).includes(user.id);
+                              return (
+                                <button
+                                  key={emoji}
+                                  title={`React with ${emoji}`}
+                                  onClick={() => handleReact(msg, emoji)}
+                                  style={{
+                                    background: reacted ? 'rgba(245,158,11,0.15)' : 'none',
+                                    border: reacted ? '1px solid rgba(245,158,11,0.3)' : '1px solid transparent',
+                                    borderRadius: '0.35rem',
+                                    cursor: 'pointer',
+                                    fontSize: '1rem', padding: '0.2rem 0',
+                                    lineHeight: 1, transition: 'transform 0.1s, background 0.15s',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                  }}
+                                  onMouseOver={e => (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.35)'}
+                                  onMouseOut={e => (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'}
+                                >
+                                  {emoji}
+                                </button>
+                              );
+                            })}
+                          </div>
 
+                          {/* Delete Button row if authorized */}
                           {(isMe || user?.username === 'fckitscott') && (
                             <>
-                              <div style={{ width: 1, height: 16, backgroundColor: 'rgba(255,255,255,0.1)', margin: '0 0.15rem' }} />
+                              <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.06)', margin: '0.1rem 0' }} />
                               <button
                                 onClick={() => handleDelete(msg)}
-                                title="Delete message"
                                 style={{
-                                  background: 'none', border: '1px solid transparent', cursor: 'pointer',
-                                  color: '#ef4444', display: 'flex', alignItems: 'center',
-                                  padding: '0.18rem', borderRadius: '0.35rem', transition: 'all 0.12s'
+                                  width: '100%',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem',
+                                  backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                                  borderRadius: '0.5rem',
+                                  color: '#f87171',
+                                  padding: '0.42rem 0',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s'
                                 }}
-                                onMouseOver={e => { const b = e.currentTarget as HTMLButtonElement; b.style.backgroundColor = 'rgba(239,68,68,0.15)'; b.style.borderColor = 'rgba(239,68,68,0.3)'; }}
-                                onMouseOut={e => { const b = e.currentTarget as HTMLButtonElement; b.style.backgroundColor = 'transparent'; b.style.borderColor = 'transparent'; }}
+                                onMouseOver={e => { e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.18)'; e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.35)'; }}
+                                onMouseOut={e => { e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.08)'; e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.2)'; }}
                               >
-                                <Trash2 size={13} />
+                                <Trash2 size={11} /> Delete Message
                               </button>
                             </>
                           )}

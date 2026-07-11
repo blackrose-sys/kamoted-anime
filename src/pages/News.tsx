@@ -32,6 +32,67 @@ function ScoreBadge({ score }: { score: number | null }) {
   );
 }
 
+const getCurrentSeasonAndYear = () => {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = date.getMonth(); // 0-11
+  
+  let season: 'WINTER' | 'SPRING' | 'SUMMER' | 'FALL' = 'WINTER';
+  if (month >= 2 && month <= 4) {
+    season = 'SPRING';
+  } else if (month >= 5 && month <= 7) {
+    season = 'SUMMER';
+  } else if (month >= 8 && month <= 10) {
+    season = 'FALL';
+  }
+  
+  return { season, year };
+};
+
+const mapAniListToNewsAnime = (media: any): NewsAnime => {
+  const cleanSynopsis = media.description
+    ? media.description.replace(/<[^>]*>/g, '').slice(0, 200) + '...'
+    : 'No synopsis available.';
+
+  const statusMap: Record<string, string> = {
+    'RELEASING': 'Currently Airing',
+    'FINISHED': 'Finished Airing',
+    'NOT_YET_RELEASED': 'Not Yet Airing',
+    'CANCELLED': 'Cancelled',
+    'HIATUS': 'On Hiatus'
+  };
+
+  return {
+    mal_id: media.idMal,
+    title: media.title.english || media.title.userPreferred || media.title.romaji,
+    image_url: media.coverImage.large,
+    score: media.averageScore ? media.averageScore / 10 : null,
+    synopsis: cleanSynopsis,
+    episodes: media.episodes || null,
+    year: media.seasonYear || null,
+    season: media.season || null,
+    status: statusMap[media.status] || media.status || '',
+    genres: (media.genres || []).slice(0, 3),
+    rank: null,
+    popularity: null
+  };
+};
+
+const mapJikanAnime = (d: any): NewsAnime => ({
+  mal_id: d.mal_id,
+  title: d.title_english || d.title,
+  image_url: d.images?.webp?.large_image_url || d.images?.jpg?.large_image_url || '',
+  score: d.score,
+  synopsis: d.synopsis ? d.synopsis.slice(0, 200) + '...' : 'No synopsis available.',
+  episodes: d.episodes,
+  year: d.year,
+  season: d.season,
+  status: d.status || '',
+  genres: (d.genres || []).slice(0, 3).map((g: any) => g.name),
+  rank: d.rank,
+  popularity: d.popularity,
+});
+
 export function News() {
   const [trending, setTrending] = useState<NewsAnime[]>([]);
   const [upcoming, setUpcoming] = useState<NewsAnime[]>([]);
@@ -42,33 +103,132 @@ export function News() {
   const fetchNews = async () => {
     setLoading(true);
     try {
-      // Trending (top airing)
-      const [trendRes, upcomingRes, seasonRes] = await Promise.allSettled([
-        fetch('https://api.jikan.moe/v4/top/anime?filter=airing&sfw=true&limit=18').then(r => r.json()),
-        fetch('https://api.jikan.moe/v4/seasons/upcoming?sfw=true&limit=18').then(r => r.json()),
-        fetch('https://api.jikan.moe/v4/seasons/now?sfw=true&limit=18').then(r => r.json()),
-      ]);
+      // Fetch Trending via AniList
+      let trendData: NewsAnime[] = [];
+      try {
+        const queryText = `
+          query {
+            Page(page: 1, perPage: 18) {
+              media(status: RELEASING, type: ANIME, isAdult: false, sort: [POPULARITY_DESC]) {
+                idMal
+                title { romaji english userPreferred }
+                coverImage { large }
+                averageScore
+                seasonYear
+                season
+                episodes
+                status
+                genres
+                description
+              }
+            }
+          }
+        `;
+        const res = await fetch('https://graphql.anilist.co', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: queryText })
+        });
+        const json = await res.json();
+        trendData = (json?.data?.Page?.media || []).map(mapAniListToNewsAnime);
+      } catch (err) {
+        console.error('AniList trending fetch failed, trying Jikan...', err);
+        try {
+          const res = await fetch('https://api.jikan.moe/v4/top/anime?filter=airing&sfw=true&limit=18');
+          const json = await res.json();
+          trendData = (json.data || []).map(mapJikanAnime);
+        } catch (jikanErr) {
+          console.error('Jikan fallback failed for trending:', jikanErr);
+        }
+      }
 
-      const mapAnime = (d: any): NewsAnime => ({
-        mal_id: d.mal_id,
-        title: d.title_english || d.title,
-        image_url: d.images?.webp?.large_image_url || d.images?.jpg?.large_image_url || '',
-        score: d.score,
-        synopsis: d.synopsis ? d.synopsis.slice(0, 200) + '...' : 'No synopsis available.',
-        episodes: d.episodes,
-        year: d.year,
-        season: d.season,
-        status: d.status || '',
-        genres: (d.genres || []).slice(0, 3).map((g: any) => g.name),
-        rank: d.rank,
-        popularity: d.popularity,
-      });
+      // Fetch Upcoming via AniList
+      let upcomingData: NewsAnime[] = [];
+      try {
+        const queryText = `
+          query {
+            Page(page: 1, perPage: 18) {
+              media(status: NOT_YET_RELEASED, type: ANIME, isAdult: false, sort: [POPULARITY_DESC]) {
+                idMal
+                title { romaji english userPreferred }
+                coverImage { large }
+                averageScore
+                seasonYear
+                season
+                episodes
+                status
+                genres
+                description
+              }
+            }
+          }
+        `;
+        const res = await fetch('https://graphql.anilist.co', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: queryText })
+        });
+        const json = await res.json();
+        upcomingData = (json?.data?.Page?.media || []).map(mapAniListToNewsAnime);
+      } catch (err) {
+        console.error('AniList upcoming fetch failed, trying Jikan...', err);
+        try {
+          const res = await fetch('https://api.jikan.moe/v4/seasons/upcoming?sfw=true&limit=18');
+          const json = await res.json();
+          upcomingData = (json.data || []).map(mapJikanAnime);
+        } catch (jikanErr) {
+          console.error('Jikan fallback failed for upcoming:', jikanErr);
+        }
+      }
 
-      if (trendRes.status === 'fulfilled') setTrending((trendRes.value.data || []).map(mapAnime));
-      if (upcomingRes.status === 'fulfilled') setUpcoming((upcomingRes.value.data || []).map(mapAnime));
-      if (seasonRes.status === 'fulfilled') setTopThisSeason((seasonRes.value.data || []).map(mapAnime));
+      // Fetch Season via AniList
+      let seasonData: NewsAnime[] = [];
+      try {
+        const queryText = `
+          query ($season: MediaSeason, $seasonYear: Int) {
+            Page(page: 1, perPage: 18) {
+              media(season: $season, seasonYear: $seasonYear, type: ANIME, isAdult: false, sort: [POPULARITY_DESC]) {
+                idMal
+                title { romaji english userPreferred }
+                coverImage { large }
+                averageScore
+                seasonYear
+                season
+                episodes
+                status
+                genres
+                description
+              }
+            }
+          }
+        `;
+        const { season, year } = getCurrentSeasonAndYear();
+        const res = await fetch('https://graphql.anilist.co', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: queryText,
+            variables: { season, seasonYear: year }
+          })
+        });
+        const json = await res.json();
+        seasonData = (json?.data?.Page?.media || []).map(mapAniListToNewsAnime);
+      } catch (err) {
+        console.error('AniList season fetch failed, trying Jikan...', err);
+        try {
+          const res = await fetch('https://api.jikan.moe/v4/seasons/now?sfw=true&limit=18');
+          const json = await res.json();
+          seasonData = (json.data || []).map(mapJikanAnime);
+        } catch (jikanErr) {
+          console.error('Jikan fallback failed for season:', jikanErr);
+        }
+      }
+
+      setTrending(trendData);
+      setUpcoming(upcomingData);
+      setTopThisSeason(seasonData);
     } catch (err) {
-      console.error('News fetch error:', err);
+      console.error('Failed fetching news:', err);
     } finally {
       setLoading(false);
     }

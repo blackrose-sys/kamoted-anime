@@ -972,8 +972,8 @@ export function ChatSidebar() {
                               onMouseLeave={hideBar}
                               style={{
                                 position: 'absolute',
-                                [isMe ? 'left' : 'right']: '12px',
-                                bottom: 'calc(100% - 6px)',
+                                [isMe ? 'right' : 'left']: '12px',
+                                bottom: 'calc(100% + 6px)',
                                 display: 'flex', alignItems: 'center', gap: '0.35rem',
                                 backgroundColor: 'rgba(15,15,22,0.96)',
                                 border: '1px solid rgba(255,255,255,0.08)',
@@ -1029,15 +1029,15 @@ export function ChatSidebar() {
                                   <Smile size={16} />
                                 </button>
 
-                                {/* Full Emojis Grid Popover (Opens above toolbar) */}
+                                {/* Full Emojis Grid Popover (Opens below toolbar) */}
                                 {showAllEmojis === msg.id && (
                                   <div className="fade-in" style={{
-                                    position: 'absolute', bottom: '135%', left: '50%', transform: 'translateX(-50%)',
+                                    position: 'absolute', top: '100%', marginTop: '6px', left: '50%', transform: 'translateX(-50%)',
                                     backgroundColor: 'rgba(10,10,18,0.98)',
                                     border: '1px solid rgba(255,255,255,0.1)',
                                     borderRadius: '0.75rem',
                                     padding: '0.5rem',
-                                    boxShadow: '0 -8px 24px rgba(0,0,0,0.5)',
+                                    boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
                                     zIndex: 130, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.2rem',
                                     width: '140px', backdropFilter: 'blur(16px)'
                                   }}>
@@ -1108,12 +1108,12 @@ export function ChatSidebar() {
                                 {/* More Actions Dropdown Menu */}
                                 {showMoreActions === msg.id && (
                                   <div className="fade-in" style={{
-                                    position: 'absolute', bottom: '135%', [isMe ? 'right' : 'left']: 0,
+                                    position: 'absolute', top: '100%', marginTop: '6px', [isMe ? 'right' : 'left']: 0,
                                     backgroundColor: 'rgba(10,10,18,0.98)',
                                     border: '1px solid rgba(255,255,255,0.1)',
                                     borderRadius: '0.65rem',
                                     padding: '0.35rem',
-                                    boxShadow: '0 -8px 24px rgba(0,0,0,0.5)',
+                                    boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
                                     zIndex: 130, display: 'flex', flexDirection: 'column', gap: '0.2rem',
                                     width: '130px', backdropFilter: 'blur(16px)'
                                   }}>

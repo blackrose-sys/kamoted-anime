@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Bell, CheckCheck, Trash2, AtSign } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Bell, CheckCheck, Trash2, AtSign, Play, MessageSquare } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 
@@ -38,6 +39,7 @@ function timeAgo(d: string) {
 
 export function NotificationCenter() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
@@ -240,65 +242,147 @@ export function NotificationCenter() {
               <div style={{ padding: '2.5rem 1rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
                 <div style={{ fontSize: '2rem' }}>🔔</div>
                 <div style={{ fontWeight: 700, color: 'var(--text-secondary)', fontSize: '0.85rem' }}>No notifications yet</div>
-                <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.3)' }}>When someone @mentions you in chat, you'll see it here</div>
+                <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.3)' }}>When someone @mentions you or a new episode drops, you'll see it here</div>
               </div>
             ) : (
-              notifications.map(notif => (
-                <button
-                  key={notif.id}
-                  onClick={() => { markAsRead(notif.id); setIsOpen(false); }}
-                  style={{
-                    display: 'flex', alignItems: 'flex-start', gap: '0.65rem',
-                    width: '100%', padding: '0.75rem 1rem',
-                    background: notif.is_read ? 'transparent' : 'rgba(245,158,11,0.03)',
-                    border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)',
-                    cursor: 'pointer', textAlign: 'left',
-                    transition: 'background 0.15s'
-                  }}
-                  onMouseOver={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)'}
-                  onMouseOut={e => e.currentTarget.style.backgroundColor = notif.is_read ? 'transparent' : 'rgba(245,158,11,0.03)'}
-                >
-                  {/* Avatar */}
-                  <div style={{
-                    width: 32, height: 32, borderRadius: '50%',
-                    background: getAvatarGradient(notif.from_username),
-                    padding: 2, flexShrink: 0
-                  }}>
+              notifications.map(notif => {
+                const isEpisodeDrop = notif.type === 'episode_drop';
+                const isMention = notif.type === 'mention';
+                
+                // Determine icon and color palette
+                let typeIcon = <AtSign size={10} color="rgba(255,255,255,0.4)" />;
+                let badgeText = '';
+                let badgeBg = 'transparent';
+                let badgeColor = 'transparent';
+                
+                if (isEpisodeDrop) {
+                  typeIcon = <Play size={10} color="#10b981" />;
+                  badgeText = 'NEW EPISODE';
+                  badgeBg = 'rgba(16,185,129,0.11)';
+                  badgeColor = '#10b981';
+                } else if (isMention) {
+                  typeIcon = <MessageSquare size={10} color="var(--accent-primary)" />;
+                  badgeText = 'MENTION';
+                  badgeBg = 'rgba(245,158,11,0.11)';
+                  badgeColor = 'var(--accent-primary)';
+                }
+                
+                return (
+                  <button
+                    key={notif.id}
+                    onClick={() => {
+                      markAsRead(notif.id);
+                      setIsOpen(false);
+                      if (notif.link) {
+                        navigate(notif.link);
+                      }
+                    }}
+                    style={{
+                      display: 'flex', alignItems: 'flex-start', gap: '0.75rem',
+                      width: '100%', padding: '0.85rem 1rem',
+                      background: notif.is_read ? 'transparent' : 'rgba(245,158,11,0.03)',
+                      border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)',
+                      cursor: 'pointer', textAlign: 'left',
+                      transition: 'background 0.15s, transform 0.1s',
+                      position: 'relative'
+                    }}
+                    onMouseOver={e => {
+                      e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)';
+                    }}
+                    onMouseOut={e => {
+                      e.currentTarget.style.backgroundColor = notif.is_read ? 'transparent' : 'rgba(245,158,11,0.03)';
+                    }}
+                  >
+                    {/* Avatar */}
                     <div style={{
-                      width: '100%', height: '100%', borderRadius: '50%',
-                      backgroundColor: '#111', overflow: 'hidden',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '0.7rem', fontWeight: 900, color: '#fff'
+                      width: 36, height: 36, borderRadius: '50%',
+                      background: isEpisodeDrop ? 'linear-gradient(135deg, #10b981, #059669)' : getAvatarGradient(notif.from_username),
+                      padding: 2, flexShrink: 0,
+                      position: 'relative',
+                      boxShadow: !notif.is_read && isEpisodeDrop ? '0 0 10px rgba(16,185,129,0.3)' : 'none'
                     }}>
-                      {notif.from_avatar_url
-                        ? <img src={notif.from_avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        : notif.from_username.charAt(0).toUpperCase()}
+                      <div style={{
+                        width: '100%', height: '100%', borderRadius: '50%',
+                        backgroundColor: '#111', overflow: 'hidden',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '0.75rem', fontWeight: 900, color: '#fff'
+                      }}>
+                        {notif.from_avatar_url
+                          ? <img src={notif.from_avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          : notif.from_username.charAt(0).toUpperCase()}
+                      </div>
+                      
+                      {/* Sub-badge indicating notification type */}
+                      <div style={{
+                        position: 'absolute', bottom: -3, right: -3,
+                        width: 16, height: 16, borderRadius: '50%',
+                        backgroundColor: isEpisodeDrop ? '#10b981' : 'var(--accent-primary)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        border: '1.5px solid rgba(8,8,14,0.98)',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.5)'
+                      }}>
+                        {isEpisodeDrop ? <Play size={8} color="#000" style={{ fill: '#000', marginLeft: '0.5px' }} /> : <AtSign size={8} color="#000" />}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Content */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '0.8rem', lineHeight: 1.4, color: notif.is_read ? 'rgba(255,255,255,0.6)' : 'white' }}>
-                      <strong style={{ color: notif.is_read ? 'rgba(255,255,255,0.7)' : 'var(--accent-primary)' }}>{notif.from_username}</strong>
-                      {' '}{notif.message}
+                    {/* Content */}
+                    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                        <span style={{
+                          fontSize: '0.78rem',
+                          fontWeight: 800,
+                          color: notif.is_read ? 'rgba(255,255,255,0.7)' : 'var(--accent-primary)',
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          maxWidth: '160px'
+                        }}>
+                          {notif.from_username}
+                        </span>
+                        
+                        {badgeText && (
+                          <span style={{
+                            fontSize: '0.56rem',
+                            fontWeight: 900,
+                            letterSpacing: '0.04em',
+                            padding: '0.1rem 0.4rem',
+                            borderRadius: '4px',
+                            backgroundColor: badgeBg,
+                            color: badgeColor,
+                            flexShrink: 0
+                          }}>
+                            {badgeText}
+                          </span>
+                        )}
+                      </div>
+                      
+                      <div style={{
+                        fontSize: '0.78rem',
+                        lineHeight: 1.35,
+                        color: notif.is_read ? 'rgba(255,255,255,0.5)' : '#e5e7eb',
+                        wordBreak: 'break-word'
+                      }}>
+                        {notif.message}
+                      </div>
+                      
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.1rem' }}>
+                        {typeIcon}
+                        <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', fontWeight: 600 }}>
+                          {timeAgo(notif.created_at)}
+                        </span>
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.2rem' }}>
-                      <AtSign size={10} color="rgba(255,255,255,0.3)" />
-                      <span style={{ fontSize: '0.67rem', color: 'rgba(255,255,255,0.3)' }}>{timeAgo(notif.created_at)}</span>
-                    </div>
-                  </div>
 
-                  {/* Unread dot */}
-                  {!notif.is_read && (
-                    <div style={{
-                      width: 8, height: 8, borderRadius: '50%',
-                      backgroundColor: 'var(--accent-primary)',
-                      flexShrink: 0, marginTop: '0.4rem',
-                      boxShadow: '0 0 6px rgba(245,158,11,0.5)'
-                    }} />
-                  )}
-                </button>
-              ))
+                    {/* Unread dot */}
+                    {!notif.is_read && (
+                      <div style={{
+                        width: 8, height: 8, borderRadius: '50%',
+                        backgroundColor: 'var(--accent-primary)',
+                        flexShrink: 0, marginTop: '0.35rem',
+                        boxShadow: '0 0 8px rgba(245,158,11,0.6)'
+                      }} />
+                    )}
+                  </button>
+                );
+              })
             )}
           </div>
         </div>

@@ -337,153 +337,115 @@ export function Profile() {
     setWatchlist(watchlist.filter(w => w.anime_id !== animeId));
   };
 
+  const removeFromHistory = async (historyId: string) => {
+    await supabase.from('watch_history').delete().eq('id', historyId);
+    setHistory(history.filter(h => h.id !== historyId));
+  };
+
   return (
-    <main className="container fade-in" style={{ flex: 1, padding: '8rem 1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+    <main className="container fade-in" style={{ flex: 1, padding: '8rem 1.5rem 4rem 1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', minHeight: '100vh' }}>
       
-      {/* Premium Tab Navigation */}
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', width: '100%', maxWidth: '800px', overflowX: 'auto' }}>
-        <button 
-          onClick={() => setActiveTab('settings')} 
-          style={{ 
-            background: 'none', 
-            border: 'none', 
-            color: activeTab === 'settings' ? 'var(--accent-primary)' : 'var(--text-secondary)', 
-            fontWeight: 900, 
-            cursor: 'pointer', 
-            padding: '0.5rem 1rem',
-            fontSize: '0.9rem',
-            letterSpacing: '0.05em',
-            transition: 'color 0.2s',
-            borderBottom: activeTab === 'settings' ? '2px solid var(--accent-primary)' : '2px solid transparent',
-            marginBottom: '-17px'
-          }}
-        >
-          SETTINGS
-        </button>
-        <button 
-          onClick={() => setActiveTab('watchlist')} 
-          style={{ 
-            background: 'none', 
-            border: 'none', 
-            color: activeTab === 'watchlist' ? 'var(--accent-primary)' : 'var(--text-secondary)', 
-            fontWeight: 900, 
-            cursor: 'pointer', 
-            padding: '0.5rem 1rem', 
-            display: 'flex', 
-            alignItems: 'center',
-            gap: '0.5rem',
-            fontSize: '0.9rem',
-            letterSpacing: '0.05em',
-            transition: 'color 0.2s',
-            borderBottom: activeTab === 'watchlist' ? '2px solid var(--accent-primary)' : '2px solid transparent',
-            marginBottom: '-17px'
-          }}
-        >
-          <Bookmark size={16} /> WATCHLIST
-        </button>
-        <button 
-          onClick={() => setActiveTab('history')} 
-          style={{ 
-            background: 'none', 
-            border: 'none', 
-            color: activeTab === 'history' ? 'var(--accent-primary)' : 'var(--text-secondary)', 
-            fontWeight: 900, 
-            cursor: 'pointer', 
-            padding: '0.5rem 1rem', 
-            display: 'flex', 
-            alignItems: 'center',
-            gap: '0.5rem',
-            fontSize: '0.9rem',
-            letterSpacing: '0.05em',
-            transition: 'color 0.2s',
-            borderBottom: activeTab === 'history' ? '2px solid var(--accent-primary)' : '2px solid transparent',
-            marginBottom: '-17px'
-          }}
-        >
-          <Clock size={16} /> HISTORY
-        </button>
-        <button 
-          onClick={() => setActiveTab('lists')} 
-          style={{ 
-            background: 'none', 
-            border: 'none', 
-            color: activeTab === 'lists' ? 'var(--accent-primary)' : 'var(--text-secondary)', 
-            fontWeight: 900, 
-            cursor: 'pointer', 
-            padding: '0.5rem 1rem', 
-            display: 'flex', 
-            alignItems: 'center',
-            gap: '0.5rem',
-            fontSize: '0.9rem',
-            letterSpacing: '0.05em',
-            transition: 'color 0.2s',
-            borderBottom: activeTab === 'lists' ? '2px solid var(--accent-primary)' : '2px solid transparent',
-            marginBottom: '-17px'
-          }}
-        >
-          <List size={16} /> PLAYLISTS
-        </button>
-        <button 
-          onClick={() => setActiveTab('security')} 
-          style={{ 
-            background: 'none', 
-            border: 'none', 
-            color: activeTab === 'security' ? 'var(--accent-primary)' : 'var(--text-secondary)', 
-            fontWeight: 900, 
-            cursor: 'pointer', 
-            padding: '0.5rem 1rem', 
-            display: 'flex', 
-            alignItems: 'center',
-            gap: '0.5rem',
-            fontSize: '0.9rem',
-            letterSpacing: '0.05em',
-            transition: 'color 0.2s',
-            borderBottom: activeTab === 'security' ? '2px solid var(--accent-primary)' : '2px solid transparent',
-            marginBottom: '-17px'
-          }}
-        >
-          <Shield size={16} /> SECURITY
-        </button>
+      {/* Premium Tab Navigation Capsule */}
+      <div className="glass" style={{ 
+        display: 'flex', 
+        gap: '0.25rem', 
+        marginBottom: '2.5rem', 
+        padding: '0.35rem', 
+        borderRadius: '1rem', 
+        border: '1px solid var(--border-color)', 
+        width: '100%', 
+        maxWidth: '800px', 
+        overflowX: 'auto',
+        backgroundColor: 'rgba(10, 10, 15, 0.45)',
+        backdropFilter: 'blur(16px)',
+        alignItems: 'center'
+      }}>
+        {[
+          { id: 'settings' as const, label: 'SETTINGS', icon: <User size={15} /> },
+          { id: 'watchlist' as const, label: 'WATCHLIST', icon: <Bookmark size={15} /> },
+          { id: 'history' as const, label: 'HISTORY', icon: <Clock size={15} /> },
+          { id: 'lists' as const, label: 'PLAYLISTS', icon: <List size={15} /> },
+          { id: 'security' as const, label: 'SECURITY', icon: <Shield size={15} /> }
+        ].map(tab => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                padding: '0.65rem 1.25rem',
+                borderRadius: '0.75rem',
+                backgroundColor: isActive ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+                color: isActive ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                border: `1px solid ${isActive ? 'rgba(255, 255, 255, 0.05)' : 'transparent'}`,
+                fontWeight: 800,
+                fontSize: '0.8rem',
+                letterSpacing: '0.04em',
+                cursor: 'pointer',
+                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                whiteSpace: 'nowrap',
+                flexShrink: 0
+              }}
+            >
+              {tab.icon}
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Main Glassmorphism Card */}
-      <div className="glass" style={{ width: '100%', maxWidth: '800px', padding: '3rem', borderRadius: '1.25rem', border: '1px solid var(--border-color)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', position: 'relative' }}>
+      {/* Main Premium Dashboard Card */}
+      <div className="glass" style={{ 
+        width: '100%', 
+        maxWidth: '800px', 
+        padding: '2.5rem', 
+        borderRadius: '1.5rem', 
+        border: '1px solid var(--border-color)', 
+        boxShadow: '0 24px 64px rgba(0,0,0,0.65)', 
+        position: 'relative',
+        backgroundColor: 'rgba(8, 8, 12, 0.65)',
+        backdropFilter: 'blur(20px)'
+      }}>
         
         {/* Gamification Dashboard */}
         {!statsLoading && (
           <div style={{
             display: 'flex',
             flexDirection: 'row',
-            gap: '2rem',
+            gap: '1.75rem',
             alignItems: 'center',
-            backgroundColor: 'rgba(255,255,255,0.02)',
-            border: '1px solid var(--border-color)',
-            borderRadius: '1rem',
+            backgroundColor: 'rgba(255,255,255,0.01)',
+            border: '1px solid rgba(255,255,255,0.04)',
+            borderRadius: '1.2rem',
             padding: '1.5rem',
             marginBottom: '2.5rem',
-            flexWrap: 'wrap'
+            flexWrap: 'wrap',
+            boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.05)'
           }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: '150px' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: '150px' }}>
+              <div style={{ fontSize: '0.7rem', fontWeight: 900, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                 Watcher Level
               </div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.25rem' }}>
-                <span style={{ fontSize: '2.25rem', fontWeight: 900, color: 'var(--accent-primary)', textShadow: '0 0 15px rgba(245,158,11,0.2)' }}>Lvl {stats.level}</span>
+                <span className="text-gradient" style={{ fontSize: '2.5rem', fontWeight: 900, textShadow: '0 0 20px rgba(245,158,11,0.25)' }}>Lvl {stats.level}</span>
               </div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
                 {stats.episodesCount} episodes watched
               </div>
             </div>
             
-            <div style={{ flex: 1, minWidth: '200px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+            <div style={{ flex: 1, minWidth: '220px', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)', letterSpacing: '0.04em' }}>
                 <span>XP PROGRESS</span>
-                <span>{stats.xp} / {stats.nextLevelXp} XP</span>
+                <span style={{ color: 'var(--accent-primary)' }}>{stats.xp} / {stats.nextLevelXp} XP</span>
               </div>
-              <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--bg-color-tertiary)', borderRadius: '9999px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
-                <div style={{ width: `${(stats.xp / stats.nextLevelXp) * 100}%`, height: '100%', background: 'linear-gradient(90deg, var(--accent-primary), #8b5cf6)', borderRadius: '9999px', boxShadow: '0 0 10px rgba(245,158,11,0.5)' }} />
+              <div style={{ width: '100%', height: '8px', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '9999px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ width: `${(stats.xp / stats.nextLevelXp) * 100}%`, height: '100%', background: 'linear-gradient(90deg, var(--accent-primary) 0%, var(--accent-secondary) 100%)', borderRadius: '9999px', boxShadow: '0 0 12px rgba(245,158,11,0.45)' }} />
               </div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
                 {100 - stats.xp} XP to next level
               </div>
             </div>
@@ -491,7 +453,7 @@ export function Profile() {
             <div style={{ width: '100%', height: '1px', backgroundColor: 'var(--border-color)' }} />
 
             <div style={{ width: '100%' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>
+              <div style={{ fontSize: '0.7rem', fontWeight: 900, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '1rem' }}>
                 Unlocked Achievements
               </div>
               <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -502,21 +464,21 @@ export function Profile() {
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.5rem',
-                      padding: '0.5rem 0.75rem',
-                      borderRadius: '0.5rem',
-                      backgroundColor: badge.unlocked ? 'rgba(245, 158, 11, 0.1)' : 'rgba(255, 255, 255, 0.02)',
-                      border: `1px solid ${badge.unlocked ? 'var(--accent-primary)' : 'var(--border-color)'}`,
-                      opacity: badge.unlocked ? 1 : 0.4,
-                      transition: 'all 0.2s',
-                      boxShadow: badge.unlocked ? '0 0 15px rgba(245,158,11,0.15)' : 'none',
+                      gap: '0.65rem',
+                      padding: '0.5rem 0.85rem',
+                      borderRadius: '0.75rem',
+                      backgroundColor: badge.unlocked ? 'rgba(245, 158, 11, 0.06)' : 'rgba(255, 255, 255, 0.02)',
+                      border: `1px solid ${badge.unlocked ? 'rgba(245, 158, 11, 0.25)' : 'var(--border-color)'}`,
+                      filter: badge.unlocked ? 'none' : 'grayscale(1) opacity(0.35)',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      boxShadow: badge.unlocked ? '0 4px 12px rgba(245,158,11,0.1)' : 'none',
                       cursor: 'help'
                     }}
                   >
-                    <span style={{ fontSize: '1.25rem' }}>{badge.icon}</span>
+                    <span style={{ fontSize: '1.35rem' }}>{badge.icon}</span>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: badge.unlocked ? 'white' : 'var(--text-secondary)' }}>{badge.name}</span>
-                      <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>{badge.description}</span>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 900, color: badge.unlocked ? 'white' : 'var(--text-secondary)' }}>{badge.name}</span>
+                      <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', fontWeight: 500 }}>{badge.description}</span>
                     </div>
                   </div>
                 ))}
@@ -529,31 +491,31 @@ export function Profile() {
         {activeTab === 'settings' && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-              <h1 style={{ fontSize: '2.5rem', fontWeight: 900, textAlign: 'center', letterSpacing: '-0.02em', margin: 0 }}>My Profile</h1>
+              <h1 style={{ fontSize: '2.25rem', fontWeight: 900, textAlign: 'center', letterSpacing: '-0.03em', margin: 0 }}>My Profile</h1>
               <UserBadge username={user.username} size="lg" />
             </div>
             
             {/* Avatar Section */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem' }}>
-              <div style={{ position: 'relative', width: '150px', height: '150px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem' }}>
+              <div style={{ position: 'relative', width: '140px', height: '140px' }}>
                 <div style={{ 
                   width: '100%', 
                   height: '100%', 
                   borderRadius: '50%', 
-                  background: 'linear-gradient(135deg, var(--accent-primary), #8b5cf6)', 
-                  padding: '4px', 
-                  boxShadow: '0 8px 32px rgba(139, 92, 246, 0.2)',
+                  background: 'linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%)', 
+                  padding: '3px', 
+                  boxShadow: '0 8px 32px rgba(139, 92, 246, 0.25)',
                   display: 'flex',
                   justifyContent: 'center',
                   alignItems: 'center'
                 }}>
-                  <div style={{ position: 'relative', width: '100%', height: '100%', borderRadius: '50%', backgroundColor: 'var(--bg-color-tertiary)', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                  <div style={{ position: 'relative', width: '100%', height: '100%', borderRadius: '50%', backgroundColor: '#08080a', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                     {uploading ? (
-                      <Loader2 className="animate-spin" size={40} color="var(--accent-primary)" />
+                      <Loader2 className="animate-spin" size={36} color="var(--accent-primary)" />
                     ) : user.avatar_url ? (
                       <img src={user.avatar_url} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (
-                      <span style={{ fontSize: '4.5rem', fontWeight: 900, color: 'var(--text-secondary)' }}>{user.username?.charAt(0).toUpperCase()}</span>
+                      <span style={{ fontSize: '4rem', fontWeight: 900, color: 'var(--text-secondary)' }}>{user.username?.charAt(0).toUpperCase()}</span>
                     )}
                   </div>
                 </div>
@@ -564,21 +526,23 @@ export function Profile() {
                     position: 'absolute', 
                     bottom: '4px', 
                     right: '4px', 
-                    width: '40px', 
-                    height: '40px', 
+                    width: '36px', 
+                    height: '36px', 
                     borderRadius: '50%', 
                     backgroundColor: 'var(--accent-primary)', 
                     display: 'flex', 
                     justifyContent: 'center', 
                     alignItems: 'center', 
                     cursor: 'pointer', 
-                    border: '3px solid var(--bg-color-secondary)', 
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                    transition: 'transform 0.2s'
+                    border: '3px solid #0a0a0f', 
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                    transition: 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
                   }}
                   className="hover-scale"
+                  onMouseOver={e => e.currentTarget.style.transform = 'scale(1.15)'}
+                  onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}
                 >
-                  <Camera size={18} color="black" />
+                  <Camera size={16} color="black" />
                   <input 
                     type="file" 
                     accept="image/*" 
@@ -587,44 +551,45 @@ export function Profile() {
                   />
                 </label>
               </div>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Click the camera icon to upload and crop a new avatar</p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', fontWeight: 500 }}>Click the camera icon to upload and crop a new avatar</p>
             </div>
-
+ 
             {/* Profile Fields & Settings Form */}
             <form onSubmit={handleSaveUsername} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '500px' }}>
               
               {/* Success Notification Alert */}
               {showSuccessMsg && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34, 197, 94, 0.3)', color: '#86efac', padding: '0.85rem 1rem', borderRadius: '0.75rem', fontSize: '0.875rem', fontWeight: 600 }}>
-                  <Check size={18} color="#22c55e" />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', backgroundColor: 'rgba(34, 197, 94, 0.08)', border: '1px solid rgba(34, 197, 94, 0.25)', color: '#4ade80', padding: '0.85rem 1.1rem', borderRadius: '0.75rem', fontSize: '0.85rem', fontWeight: 700 }}>
+                  <Check size={16} color="#4ade80" />
                   Profile updated successfully!
                 </div>
               )}
-
+ 
               {/* Email Address (Read-only) */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>
-                  <Mail size={14} /> Email Address
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.72rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-secondary)' }}>
+                  <Mail size={13} /> Email Address
                 </label>
                 <div style={{ 
                   display: 'flex',
                   alignItems: 'center',
                   padding: '0.85rem 1rem',
                   borderRadius: '0.75rem',
-                  backgroundColor: 'rgba(255,255,255,0.03)',
+                  backgroundColor: 'rgba(255,255,255,0.02)',
                   border: '1px solid var(--border-color)',
                   color: 'var(--text-secondary)',
-                  fontSize: '0.95rem'
+                  fontSize: '0.9rem',
+                  fontWeight: 600
                 }}>
                   {user.email}
                 </div>
-                <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.75rem', margin: 0 }}>Email address cannot be changed</p>
+                <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.72rem', margin: 0, fontWeight: 500 }}>Email address cannot be changed</p>
               </div>
-
+ 
               {/* Username Input */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>
-                  <User size={14} /> Username
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.72rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-secondary)' }}>
+                  <User size={13} /> Username
                 </label>
                 <div style={{ position: 'relative' }}>
                   <input 
@@ -637,22 +602,23 @@ export function Profile() {
                       width: '100%',
                       padding: '0.85rem 1rem',
                       borderRadius: '0.75rem',
-                      backgroundColor: 'var(--bg-color-secondary)',
+                      backgroundColor: 'rgba(255,255,255,0.03)',
                       border: '1px solid var(--border-color)',
                       color: 'white',
                       outline: 'none',
-                      fontSize: '0.95rem',
-                      transition: 'border-color 0.2s, box-shadow 0.2s',
+                      fontSize: '0.9rem',
+                      fontWeight: 600,
+                      transition: 'all 0.25s ease',
                     }}
-                    onFocus={e => { e.target.style.borderColor = 'var(--accent-primary)'; e.target.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.15)'; }}
+                    onFocus={e => { e.target.style.borderColor = 'var(--accent-primary)'; e.target.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.1)'; }}
                     onBlur={e => { e.target.style.borderColor = 'var(--border-color)'; e.target.style.boxShadow = 'none'; }}
                   />
                 </div>
               </div>
-
+ 
               {/* Watchlist Privacy Selector */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.72rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-secondary)' }}>
                   Watchlist Privacy
                 </label>
                 <div style={{ display: 'flex', gap: '1rem' }}>
@@ -663,19 +629,20 @@ export function Profile() {
                       flex: 1,
                       padding: '0.85rem 1rem',
                       borderRadius: '0.75rem',
-                      backgroundColor: privacy === 'public' ? 'rgba(245, 158, 11, 0.1)' : 'var(--bg-color-secondary)',
+                      backgroundColor: privacy === 'public' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(255,255,255,0.03)',
                       border: privacy === 'public' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
                       color: privacy === 'public' ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                      fontWeight: 700,
+                      fontWeight: 800,
+                      fontSize: '0.85rem',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '0.5rem',
-                      transition: 'all 0.2s',
+                      transition: 'all 0.25s ease',
                     }}
                   >
-                    <Globe size={16} /> Public
+                    <Globe size={15} /> Public
                   </button>
                   <button
                     type="button"
@@ -684,28 +651,29 @@ export function Profile() {
                       flex: 1,
                       padding: '0.85rem 1rem',
                       borderRadius: '0.75rem',
-                      backgroundColor: privacy === 'private' ? 'rgba(245, 158, 11, 0.1)' : 'var(--bg-color-secondary)',
+                      backgroundColor: privacy === 'private' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(255,255,255,0.03)',
                       border: privacy === 'private' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
                       color: privacy === 'private' ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                      fontWeight: 700,
+                      fontWeight: 800,
+                      fontSize: '0.85rem',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '0.5rem',
-                      transition: 'all 0.2s',
+                      transition: 'all 0.25s ease',
                     }}
                   >
-                    <Lock size={16} /> Private
+                    <Lock size={15} /> Private
                   </button>
                 </div>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', margin: 0 }}>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 500, margin: 0 }}>
                   {privacy === 'public' 
                     ? 'Everyone can stalk your profile and see your anime playlist.' 
                     : 'Only you can view your watchlist. Other users will see it locked.'}
                 </p>
               </div>
-
+ 
               {/* Submit Button */}
               <button 
                 type="submit"
@@ -713,7 +681,7 @@ export function Profile() {
                 style={{ 
                   padding: '0.85rem 2rem', 
                   borderRadius: '0.75rem', 
-                  background: 'linear-gradient(135deg, var(--accent-primary), #8b5cf6)', 
+                  background: 'linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%)', 
                   color: 'black', 
                   border: 'none', 
                   cursor: updatingUsername || (usernameInput.trim() === user.username && privacy === user.watchlist_privacy) ? 'not-allowed' : 'pointer',
@@ -721,15 +689,15 @@ export function Profile() {
                   justifyContent: 'center', 
                   alignItems: 'center',
                   gap: '0.5rem',
-                  fontWeight: 800,
-                  fontSize: '0.95rem',
-                  boxShadow: '0 4px 15px rgba(245, 158, 11, 0.25)',
+                  fontWeight: 900,
+                  fontSize: '0.9rem',
+                  boxShadow: '0 4px 20px rgba(245, 158, 11, 0.2)',
                   transition: 'all 0.3s ease',
-                  opacity: updatingUsername || (usernameInput.trim() === user.username && privacy === user.watchlist_privacy) ? 0.4 : 1,
+                  opacity: updatingUsername || (usernameInput.trim() === user.username && privacy === user.watchlist_privacy) ? 0.35 : 1,
                   marginTop: '0.5rem'
                 }}
               >
-                {updatingUsername ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                {updatingUsername ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
                 {updatingUsername ? 'Saving...' : 'Save Changes'}
               </button>
             </form>
@@ -740,32 +708,32 @@ export function Profile() {
         {activeTab === 'security' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', maxWidth: '500px', width: '100%', margin: '0 auto' }}>
             <div>
-              <h2 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Shield size={22} color="var(--accent-primary)" /> Security
+              <h2 style={{ fontSize: '1.35rem', fontWeight: 900, marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Shield size={20} color="var(--accent-primary)" /> Security Settings
               </h2>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>Update your password to keep your account secure.</p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 500, margin: 0 }}>Update your password to keep your account secure.</p>
             </div>
-
+ 
             {securityError && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#fca5a5', padding: '0.85rem 1rem', borderRadius: '0.75rem', fontSize: '0.85rem', fontWeight: 600 }}>
-                <X size={18} color="#ef4444" style={{ flexShrink: 0 }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', backgroundColor: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', color: '#fca5a5', padding: '0.85rem 1.1rem', borderRadius: '0.75rem', fontSize: '0.85rem', fontWeight: 700 }}>
+                <X size={16} color="#ef4444" style={{ flexShrink: 0 }} />
                 {securityError}
               </div>
             )}
-
+ 
             {securitySuccess ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', textAlign: 'center', padding: '2rem 0' }}>
-                <div style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'rgba(74, 222, 128, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <CheckCircle2 size={28} color="#4ade80" />
+                <div style={{ width: '50px', height: '50px', borderRadius: '50%', backgroundColor: 'rgba(74, 222, 128, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <CheckCircle2 size={24} color="#4ade80" />
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: '0.25rem' }}>Password Updated!</h3>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', lineHeight: 1.5 }}>Your password has been changed successfully.</p>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 900, marginBottom: '0.25rem' }}>Password Updated!</h3>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 500, lineHeight: 1.5 }}>Your password has been changed successfully.</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => { setSecuritySuccess(false); setCurrentPassword(''); setNewPassword(''); setConfirmNewPassword(''); }}
-                  style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
+                  style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem' }}
                 >
                   Change again
                 </button>
@@ -796,87 +764,87 @@ export function Profile() {
               }} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                 {/* Current Password */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>Current Password</label>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-secondary)' }}>Current Password</label>
                   <div style={{ position: 'relative' }}>
-                    <Lock size={18} color="var(--text-secondary)" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }} />
+                    <Lock size={16} color="var(--text-secondary)" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }} />
                     <input
                       type={showCurrentPassword ? 'text' : 'password'}
                       required
                       placeholder="Enter current password"
                       value={currentPassword}
                       onChange={e => setCurrentPassword(e.target.value)}
-                      style={{ width: '100%', padding: '0.85rem 2.75rem 0.85rem 2.75rem', borderRadius: '0.75rem', backgroundColor: 'var(--bg-color-secondary)', border: '1px solid var(--border-color)', color: 'white', outline: 'none', fontSize: '0.95rem', transition: 'border-color 0.2s, box-shadow 0.2s' }}
-                      onFocus={e => { e.target.style.borderColor = 'var(--accent-primary)'; e.target.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.15)'; }}
+                      style={{ width: '100%', padding: '0.85rem 2.75rem 0.85rem 2.75rem', borderRadius: '0.75rem', backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', color: 'white', outline: 'none', fontSize: '0.9rem', fontWeight: 600, transition: 'all 0.25s ease' }}
+                      onFocus={e => { e.target.style.borderColor = 'var(--accent-primary)'; e.target.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.1)'; }}
                       onBlur={e => { e.target.style.borderColor = 'var(--border-color)'; e.target.style.boxShadow = 'none'; }}
                     />
                     <button type="button" onClick={() => setShowCurrentPassword(!showCurrentPassword)} style={{ position: 'absolute', right: '0.85rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                      {showCurrentPassword ? <EyeOff size={18} color="var(--text-secondary)" /> : <Eye size={18} color="var(--text-secondary)" />}
+                      {showCurrentPassword ? <EyeOff size={16} color="var(--text-secondary)" /> : <Eye size={16} color="var(--text-secondary)" />}
                     </button>
                   </div>
                 </div>
-
+ 
                 <div style={{ width: '100%', height: '1px', backgroundColor: 'var(--border-color)' }} />
-
+ 
                 {/* New Password */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>New Password</label>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-secondary)' }}>New Password</label>
                   <div style={{ position: 'relative' }}>
-                    <Lock size={18} color="var(--text-secondary)" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }} />
+                    <Lock size={16} color="var(--text-secondary)" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }} />
                     <input
                       type={showNewPassword ? 'text' : 'password'}
                       required
                       placeholder="At least 6 characters"
                       value={newPassword}
                       onChange={e => setNewPassword(e.target.value)}
-                      style={{ width: '100%', padding: '0.85rem 2.75rem 0.85rem 2.75rem', borderRadius: '0.75rem', backgroundColor: 'var(--bg-color-secondary)', border: '1px solid var(--border-color)', color: 'white', outline: 'none', fontSize: '0.95rem', transition: 'border-color 0.2s, box-shadow 0.2s' }}
-                      onFocus={e => { e.target.style.borderColor = 'var(--accent-primary)'; e.target.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.15)'; }}
+                      style={{ width: '100%', padding: '0.85rem 2.75rem 0.85rem 2.75rem', borderRadius: '0.75rem', backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', color: 'white', outline: 'none', fontSize: '0.9rem', fontWeight: 600, transition: 'all 0.25s ease' }}
+                      onFocus={e => { e.target.style.borderColor = 'var(--accent-primary)'; e.target.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.1)'; }}
                       onBlur={e => { e.target.style.borderColor = 'var(--border-color)'; e.target.style.boxShadow = 'none'; }}
                     />
                     <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} style={{ position: 'absolute', right: '0.85rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                      {showNewPassword ? <EyeOff size={18} color="var(--text-secondary)" /> : <Eye size={18} color="var(--text-secondary)" />}
+                      {showNewPassword ? <EyeOff size={16} color="var(--text-secondary)" /> : <Eye size={16} color="var(--text-secondary)" />}
                     </button>
                   </div>
                 </div>
-
+ 
                 {/* Confirm New Password */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>Confirm New Password</label>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-secondary)' }}>Confirm New Password</label>
                   <div style={{ position: 'relative' }}>
-                    <Lock size={18} color="var(--text-secondary)" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }} />
+                    <Lock size={16} color="var(--text-secondary)" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }} />
                     <input
                       type={showNewPassword ? 'text' : 'password'}
                       required
                       placeholder="Re-enter new password"
                       value={confirmNewPassword}
                       onChange={e => setConfirmNewPassword(e.target.value)}
-                      style={{ width: '100%', padding: '0.85rem 1rem 0.85rem 2.75rem', borderRadius: '0.75rem', backgroundColor: 'var(--bg-color-secondary)', border: '1px solid var(--border-color)', color: 'white', outline: 'none', fontSize: '0.95rem', transition: 'border-color 0.2s, box-shadow 0.2s' }}
-                      onFocus={e => { e.target.style.borderColor = 'var(--accent-primary)'; e.target.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.15)'; }}
+                      style={{ width: '100%', padding: '0.85rem 1rem 0.85rem 2.75rem', borderRadius: '0.75rem', backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', color: 'white', outline: 'none', fontSize: '0.9rem', fontWeight: 600, transition: 'all 0.25s ease' }}
+                      onFocus={e => { e.target.style.borderColor = 'var(--accent-primary)'; e.target.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.1)'; }}
                       onBlur={e => { e.target.style.borderColor = 'var(--border-color)'; e.target.style.boxShadow = 'none'; }}
                     />
                   </div>
                 </div>
-
+ 
                 {/* Password strength checks */}
                 {newPassword.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.78rem', padding: '0.5rem 0.75rem', borderRadius: '0.5rem', backgroundColor: 'rgba(255,255,255,0.03)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: newPassword.length >= 6 ? '#4ade80' : 'rgba(255,255,255,0.35)' }}>
-                      <span style={{ fontSize: '1.2rem', lineHeight: 0.8 }}>{newPassword.length >= 6 ? '✓' : '•'}</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.75rem', padding: '0.65rem 0.85rem', borderRadius: '0.65rem', backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.03)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: newPassword.length >= 6 ? '#4ade80' : 'var(--text-secondary)', fontWeight: 600 }}>
+                      <span style={{ fontSize: '1rem', lineHeight: 0.8 }}>{newPassword.length >= 6 ? '✓' : '•'}</span>
                       <span>Minimum 6 characters</span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: newPassword === confirmNewPassword && confirmNewPassword.length > 0 ? '#4ade80' : 'rgba(255,255,255,0.35)' }}>
-                      <span style={{ fontSize: '1.2rem', lineHeight: 0.8 }}>{newPassword === confirmNewPassword && confirmNewPassword.length > 0 ? '✓' : '•'}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: newPassword === confirmNewPassword && confirmNewPassword.length > 0 ? '#4ade80' : 'var(--text-secondary)', fontWeight: 600 }}>
+                      <span style={{ fontSize: '1rem', lineHeight: 0.8 }}>{newPassword === confirmNewPassword && confirmNewPassword.length > 0 ? '✓' : '•'}</span>
                       <span>Passwords match</span>
                     </div>
                   </div>
                 )}
-
+ 
                 <button
                   type="submit"
                   disabled={securityLoading || !currentPassword || newPassword.length < 6 || newPassword !== confirmNewPassword}
                   style={{
                     padding: '0.85rem 2rem',
                     borderRadius: '0.75rem',
-                    background: 'linear-gradient(135deg, var(--accent-primary), #8b5cf6)',
+                    background: 'linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%)',
                     color: 'black',
                     border: 'none',
                     cursor: securityLoading || !currentPassword || newPassword.length < 6 || newPassword !== confirmNewPassword ? 'not-allowed' : 'pointer',
@@ -884,22 +852,22 @@ export function Profile() {
                     justifyContent: 'center',
                     alignItems: 'center',
                     gap: '0.5rem',
-                    fontWeight: 800,
-                    fontSize: '0.95rem',
-                    boxShadow: '0 4px 15px rgba(245, 158, 11, 0.25)',
+                    fontWeight: 900,
+                    fontSize: '0.9rem',
+                    boxShadow: '0 4px 20px rgba(245, 158, 11, 0.2)',
                     transition: 'all 0.3s ease',
-                    opacity: securityLoading || !currentPassword || newPassword.length < 6 || newPassword !== confirmNewPassword ? 0.4 : 1,
+                    opacity: securityLoading || !currentPassword || newPassword.length < 6 || newPassword !== confirmNewPassword ? 0.35 : 1,
                     marginTop: '0.5rem'
                   }}
                 >
-                  {securityLoading ? <Loader2 className="animate-spin" size={18} /> : <Shield size={18} />}
+                  {securityLoading ? <Loader2 className="animate-spin" size={16} /> : <Shield size={16} />}
                   {securityLoading ? 'Updating...' : 'Update Password'}
                 </button>
               </form>
             )}
           </div>
         )}
-
+ 
         {/* TAB 2: WATCHLIST */}
         {activeTab === 'watchlist' && (() => {
           const filtered = watchlist.filter(item => {
@@ -909,10 +877,10 @@ export function Profile() {
           });
           return (
             <div>
-              <h2 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: '2rem', textTransform: 'uppercase', letterSpacing: '-0.01em' }}>My Watchlist</h2>
+              <h2 style={{ fontSize: '1.35rem', fontWeight: 900, marginBottom: '1.75rem', textTransform: 'uppercase', letterSpacing: '-0.01em' }}>My Watchlist</h2>
               
               {/* Category tabs */}
-              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '0.45rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
                 {[
                   { value: 'all', label: 'All' },
                   { value: 'watching', label: 'Watching' },
@@ -926,52 +894,69 @@ export function Profile() {
                     type="button"
                     onClick={() => setSelectedWatchlistCategory(cat.value)}
                     style={{
-                      padding: '0.4rem 0.8rem',
-                      borderRadius: '0.5rem',
-                      backgroundColor: selectedWatchlistCategory === cat.value ? 'var(--accent-primary)' : 'rgba(255,255,255,0.03)',
-                      color: selectedWatchlistCategory === cat.value ? 'black' : 'white',
-                      border: '1px solid var(--border-color)',
-                      fontWeight: 700,
-                      fontSize: '0.8rem',
+                      padding: '0.55rem 0.95rem',
+                      borderRadius: '0.65rem',
+                      backgroundColor: selectedWatchlistCategory === cat.value ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255,255,255,0.02)',
+                      color: selectedWatchlistCategory === cat.value ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                      border: `1px solid ${selectedWatchlistCategory === cat.value ? 'rgba(255,255,255,0.05)' : 'var(--border-color)'}`,
+                      fontWeight: 800,
+                      fontSize: '0.75rem',
                       cursor: 'pointer',
-                      transition: 'all 0.2s'
+                      transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
                     }}
                   >
-                    {cat.label} ({
+                    {cat.label} <span style={{ opacity: 0.65, marginLeft: '0.15rem', fontSize: '0.7rem' }}>({
                       cat.value === 'all' 
                         ? watchlist.length 
                         : watchlist.filter(item => (item.status || 'watching') === cat.value).length
-                    })
+                    })</span>
                   </button>
                 ))}
               </div>
-
+ 
               {filtered.length === 0 ? (
                 <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '4rem 2rem' }}>
-                  <Bookmark size={40} style={{ color: 'var(--border-color)', marginBottom: '1rem' }} />
-                  <div>No anime found in this folder!</div>
+                  <Bookmark size={36} style={{ color: 'var(--border-color)', marginBottom: '1rem' }} />
+                  <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>No anime found in this category!</div>
                   {selectedWatchlistCategory === 'all' && (
-                    <Link to="/" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 700, display: 'inline-block', marginTop: '1rem' }}>Browse Shows</Link>
+                    <Link to="/" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 800, display: 'inline-block', marginTop: '1rem', fontSize: '0.85rem' }}>Browse Shows</Link>
                   )}
                 </div>
               ) : (
                 <div className="grid">
                   {filtered.map(item => (
-                    <div key={item.id} style={{ position: 'relative' }}>
-                      <Link to={`/watch/${item.anime_id}`} className="hover-scale" style={{ display: 'block', backgroundColor: 'var(--bg-color-secondary)', borderRadius: '1rem', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+                    <div key={item.id} style={{ position: 'relative' }} className="hover-scale">
+                      <Link to={`/watch/${item.anime_id}`} style={{ display: 'block', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '1rem', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
                         <div style={{ width: '100%', aspectRatio: '2/3', position: 'relative' }}>
-                          <img src={item.image_url} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <img src={item.image_url} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
+                          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0.5rem', background: 'linear-gradient(transparent, rgba(0,0,0,0.85))' }} />
                         </div>
                         <div style={{ padding: '0.75rem' }}>
-                          <h3 style={{ fontSize: '0.875rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</h3>
+                          <h3 style={{ fontSize: '0.8rem', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', margin: 0 }}>{item.title}</h3>
                         </div>
                       </Link>
                       <button 
                         onClick={() => removeFromWatchlist(item.anime_id)}
-                        style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', backgroundColor: 'rgba(239, 68, 68, 0.95)', color: 'white', border: 'none', padding: '0.5rem', borderRadius: '0.5rem', cursor: 'pointer', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        style={{ 
+                          position: 'absolute', 
+                          top: '0.5rem', 
+                          right: '0.5rem', 
+                          backgroundColor: 'rgba(239, 68, 68, 0.9)', 
+                          color: 'white', 
+                          border: 'none', 
+                          padding: '0.45rem', 
+                          borderRadius: '0.5rem', 
+                          cursor: 'pointer', 
+                          zIndex: 10, 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          boxShadow: '0 4px 12px rgba(239,68,68,0.25)',
+                          transition: 'transform 0.2s'
+                        }}
                         className="hover-scale"
                       >
-                        <Trash2 size={15} />
+                        <Trash2 size={13} />
                       </button>
                     </div>
                   ))}
@@ -980,59 +965,79 @@ export function Profile() {
             </div>
           );
         })()}
-
+ 
         {/* TAB 3: WATCH HISTORY */}
         {activeTab === 'history' && (
           <div>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: '2rem', textTransform: 'uppercase', letterSpacing: '-0.01em' }}>Watch History</h2>
+            <h2 style={{ fontSize: '1.35rem', fontWeight: 900, marginBottom: '2rem', textTransform: 'uppercase', letterSpacing: '-0.01em' }}>Watch History</h2>
             {history.length === 0 ? (
               <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '4rem 2rem' }}>
-                <Clock size={40} style={{ color: 'var(--border-color)', marginBottom: '1rem' }} />
-                <div>You haven't watched anything yet!</div>
-                <Link to="/" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 700, display: 'inline-block', marginTop: '1rem' }}>Start Watching</Link>
+                <Clock size={36} style={{ color: 'var(--border-color)', marginBottom: '1rem' }} />
+                <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>You haven't watched anything yet!</div>
+                <Link to="/" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 800, display: 'inline-block', marginTop: '1rem', fontSize: '0.85rem' }}>Start Watching</Link>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
                 {history.map(item => (
-                  <Link to={`/watch/${item.anime_id}`} key={item.id} className="hover-scale" style={{ display: 'flex', gap: '1.25rem', backgroundColor: 'var(--bg-color-secondary)', borderRadius: '1rem', padding: '1rem', border: '1px solid var(--border-color)', alignItems: 'center' }}>
-                    <div style={{ width: '120px', aspectRatio: '16/9', borderRadius: '0.5rem', overflow: 'hidden', position: 'relative', flexShrink: 0 }}>
-                      <img src={item.image_url} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', opacity: 0.8 }}><Play size={24} color="var(--accent-primary)" fill="var(--accent-primary)" /></div>
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <h3 style={{ fontSize: '1.125rem', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</h3>
-                      <div style={{ display: 'inline-block', backgroundColor: 'var(--accent-primary)', color: 'black', padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 800, marginTop: '0.5rem' }}>
-                        EPISODE {item.last_episode}
+                  <div key={item.id} style={{ display: 'flex', gap: '1rem', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '1rem', padding: '0.85rem', border: '1px solid var(--border-color)', alignItems: 'center', position: 'relative' }} className="hover-scale">
+                    <Link to={`/watch/${item.anime_id}`} style={{ display: 'flex', flex: 1, gap: '1rem', alignItems: 'center', textDecoration: 'none', minWidth: 0 }}>
+                      <div style={{ width: '110px', aspectRatio: '16/9', borderRadius: '0.5rem', overflow: 'hidden', position: 'relative', flexShrink: 0 }}>
+                        <img src={item.image_url} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
+                        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', opacity: 0.8 }}><Play size={20} color="var(--accent-primary)" fill="var(--accent-primary)" /></div>
                       </div>
-                    </div>
-                  </Link>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <h3 style={{ fontSize: '0.95rem', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'white', margin: 0 }}>{item.title}</h3>
+                        <div style={{ display: 'inline-block', backgroundColor: 'var(--accent-primary)', color: 'black', padding: '0.15rem 0.65rem', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 900, marginTop: '0.5rem' }}>
+                          EPISODE {item.last_episode}
+                        </div>
+                      </div>
+                    </Link>
+                    <button
+                      onClick={() => removeFromHistory(item.id)}
+                      style={{
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        color: 'var(--text-secondary)',
+                        cursor: 'pointer',
+                        padding: '0.5rem',
+                        transition: 'color 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                      onMouseOver={e => e.currentTarget.style.color = '#ef4444'}
+                      onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 ))}
               </div>
             )}
           </div>
         )}
-
+ 
         {/* TAB 4: CURATED PLAYLISTS */}
         {activeTab === 'lists' && (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-              <h2 style={{ fontSize: '1.5rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '-0.01em', margin: 0 }}>Curated Playlists</h2>
-              <Link to="/lists" className="btn-primary" style={{ display: 'inline-flex', alignItems: 'center', padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 800 }}>Create New</Link>
+              <h2 style={{ fontSize: '1.35rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '-0.01em', margin: 0 }}>Curated Playlists</h2>
+              <Link to="/lists" className="btn-primary" style={{ display: 'inline-flex', alignItems: 'center', padding: '0.5rem 1.15rem', fontSize: '0.78rem', fontWeight: 900, borderRadius: '0.65rem' }}>Create New</Link>
             </div>
             {myLists.length === 0 ? (
               <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '4rem 2rem' }}>
-                <List size={40} style={{ color: 'var(--border-color)', marginBottom: '1rem' }} />
-                <div>You haven't created any custom playlists yet!</div>
-                <Link to="/lists" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 700, display: 'inline-block', marginTop: '1rem' }}>Create Playlist</Link>
+                <List size={36} style={{ color: 'var(--border-color)', marginBottom: '1rem' }} />
+                <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>You haven't created any custom playlists yet!</div>
+                <Link to="/lists" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 800, display: 'inline-block', marginTop: '1rem', fontSize: '0.85rem' }}>Create Playlist</Link>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                 {myLists.map(list => (
-                  <div key={list.id} className="glass" style={{ border: '1px solid var(--border-color)', borderRadius: '1rem', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div key={list.id} className="glass" style={{ border: '1px solid rgba(255,255,255,0.04)', backgroundColor: 'rgba(255,255,255,0.01)', borderRadius: '1.2rem', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div>
-                        <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 850 }}>{list.title}</h3>
-                        <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{list.description || 'No description'}</p>
+                        <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900 }}>{list.title}</h3>
+                        <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 500 }}>{list.description || 'No description'}</p>
                       </div>
                       <button
                         onClick={async () => {
@@ -1041,7 +1046,7 @@ export function Profile() {
                             setMyLists(myLists.filter(l => l.id !== list.id));
                           }
                         }}
-                        style={{ backgroundColor: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                        style={{ backgroundColor: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', transition: 'color 0.2s' }}
                         onMouseOver={e => e.currentTarget.style.color = '#ef4444'}
                         onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'}
                       >
@@ -1051,8 +1056,8 @@ export function Profile() {
                     <div style={{ display: 'flex', gap: '0.75rem', overflowX: 'auto', paddingBottom: '0.25rem' }}>
                       {list.items?.map((item: any) => (
                         <div key={item.id} style={{ width: '80px', flexShrink: 0 }}>
-                          <img src={item.image_url} alt="" style={{ width: '100%', aspectRatio: '2/3', borderRadius: '0.25rem', objectFit: 'cover', border: '1px solid var(--border-color)' }} />
-                          <div style={{ fontSize: '0.65rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '0.25rem' }}>{item.title}</div>
+                          <img src={item.image_url} alt="" style={{ width: '100%', aspectRatio: '2/3', borderRadius: '0.5rem', objectFit: 'cover', border: '1px solid var(--border-color)' }} />
+                          <div style={{ fontSize: '0.65rem', fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '0.25rem' }}>{item.title}</div>
                         </div>
                       ))}
                     </div>

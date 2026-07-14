@@ -372,7 +372,8 @@ export function Home() {
       setError('Failed to load anime data. Please refresh the page.');
     }
     setLoading(false);
-  }, [recentlyUpdated]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Fetch anime data ONCE on mount (no dependency on user)
   useEffect(() => {

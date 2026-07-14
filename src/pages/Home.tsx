@@ -51,6 +51,46 @@ async function fetchWithRetry(url: string, retries = 3, delayMs = 1500): Promise
   }
 }
 
+const getCurrentSeasonAndYear = () => {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = date.getMonth(); // 0-11
+  
+  let season: 'WINTER' | 'SPRING' | 'SUMMER' | 'FALL' = 'WINTER';
+  if (month >= 2 && month <= 4) {
+    season = 'SPRING';
+  } else if (month >= 5 && month <= 7) {
+    season = 'SUMMER';
+  } else if (month >= 8 && month <= 10) {
+    season = 'FALL';
+  }
+  
+  return { season, year };
+};
+
+const mapAniListMedia = (mediaList: any[]): AnimeData[] => {
+  return mediaList
+    .filter((m: any) => m && m.idMal)
+    .map((m: any) => ({
+      mal_id: m.idMal,
+      title: m.title.english || m.title.userPreferred || m.title.romaji,
+      images: {
+        jpg: {
+          image_url: m.coverImage.large,
+          large_image_url: m.coverImage.large
+        },
+        webp: {
+          image_url: m.coverImage.large,
+          large_image_url: m.coverImage.large
+        }
+      },
+      score: m.averageScore ? m.averageScore / 10 : null,
+      year: m.seasonYear || null,
+      season: m.season || null,
+      episodes: m.episodes || null
+    }));
+};
+
 export function Home() {
   const [latestAnime, setLatestAnime] = useState<AnimeData[]>([]);
   const [recentlyUpdated, setRecentlyUpdated] = useState<AnimeData[]>([]);
@@ -61,12 +101,12 @@ export function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
-
+ 
   // --- Fetch anime data (separate from user data) ---
   const fetchAnimeData = useCallback(async () => {
     setLoading(true);
     setError(null);
-
+ 
     // 1. Latest this season (check cache first)
     let latestData: AnimeData[] = [];
     try {
@@ -74,31 +114,62 @@ export function Home() {
       if (cached) {
         latestData = cached;
       } else {
-        const res = await fetchWithRetry('https://api.jikan.moe/v4/seasons/now?sfw=true&limit=24');
-        const rawList = res.data || [];
-        const seenIds = new Set<number>();
-        const uniqueList: AnimeData[] = [];
-        
-        for (const anime of rawList) {
-          if (!seenIds.has(anime.mal_id)) {
-            const img = anime.images?.jpg?.image_url || '';
-            if (!img.includes('icon-banned') && !img.includes('na.gif')) {
-              seenIds.add(anime.mal_id);
-              uniqueList.push(anime);
+        try {
+          const queryText = `
+            query ($season: MediaSeason, $seasonYear: Int) {
+              Page(page: 1, perPage: 24) {
+                media(season: $season, seasonYear: $seasonYear, type: ANIME, isAdult: false, sort: [POPULARITY_DESC]) {
+                  idMal
+                  title { romaji english userPreferred }
+                  coverImage { large }
+                  averageScore
+                  seasonYear
+                  season
+                  episodes
+                }
+              }
+            }
+          `;
+          const { season, year } = getCurrentSeasonAndYear();
+          const response = await fetch('https://graphql.anilist.co', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              query: queryText,
+              variables: { season, seasonYear: year }
+            })
+          });
+          const resData = await response.json();
+          const media = resData?.data?.Page?.media || [];
+          latestData = mapAniListMedia(media);
+        } catch (aniErr) {
+          console.error('Failed to fetch latest season via AniList, trying Jikan...', aniErr);
+          const res = await fetchWithRetry('https://api.jikan.moe/v4/seasons/now?sfw=true&limit=24');
+          const rawList = res.data || [];
+          const seenIds = new Set<number>();
+          const uniqueList: AnimeData[] = [];
+          
+          for (const anime of rawList) {
+            if (!seenIds.has(anime.mal_id)) {
+              const img = anime.images?.jpg?.image_url || '';
+              if (!img.includes('icon-banned') && !img.includes('na.gif')) {
+                seenIds.add(anime.mal_id);
+                uniqueList.push(anime);
+              }
             }
           }
+          latestData = uniqueList;
         }
-        latestData = uniqueList;
         setCache('home_latest', latestData);
       }
       setLatestAnime(latestData);
     } catch (err) {
       console.error('Failed to fetch latest season data:', err);
     }
-
+ 
     // Small delay to avoid rate limit
-    await new Promise(r => setTimeout(r, 600));
-
+    await new Promise(r => setTimeout(r, 200));
+ 
     // 2. Recently updated (check cache first)
     try {
       let recentData = getCached<AnimeData[]>('home_recent');
@@ -121,15 +192,16 @@ export function Home() {
                   }
                   averageScore
                   seasonYear
+                  season
                 }
               }
             }
           }
         `;
-
+ 
         const now = Math.floor(Date.now() / 1000);
         const sevenDaysAgo = now - (7 * 24 * 60 * 60);
-
+ 
         const response = await fetch('https://graphql.anilist.co', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -141,10 +213,10 @@ export function Home() {
             }
           })
         });
-
+ 
         const resData = await response.json();
         const schedules = resData?.data?.Page?.airingSchedules || [];
-
+ 
         const mapped = schedules
           .filter((s: any) => s.media && s.media.idMal && !s.media.isAdult)
           .map((s: any) => ({
@@ -158,9 +230,10 @@ export function Home() {
             },
             score: s.media.averageScore ? s.media.averageScore / 10 : null,
             year: s.media.seasonYear || null,
+            season: s.media.season || null,
             episodes: s.episode
           }));
-
+ 
         // Deduplicate recent episodes
         const seenIds = new Set<number>();
         const uniqueRecent: AnimeData[] = [];
@@ -170,7 +243,7 @@ export function Home() {
             uniqueRecent.push(anime);
           }
         }
-
+ 
         // Pad list up to 24 items with currently airing shows
         const fallbackAiring = latestData || [];
         const combined = [...uniqueRecent];
@@ -181,7 +254,7 @@ export function Home() {
             combined.push(airing);
           }
         }
-
+ 
         recentData = combined.slice(0, 24);
         setCache('home_recent', recentData);
       }
@@ -211,7 +284,7 @@ export function Home() {
             ? parseInt(item.episodes[0].title.replace(/\D/g, '')) || null 
             : null
         }));
-
+ 
         const seenIds = new Set<number>();
         const uniqueRecent: AnimeData[] = [];
         for (const anime of mapped) {
@@ -230,7 +303,7 @@ export function Home() {
             combined.push(airing);
           }
         }
-
+ 
         const recentData = combined.slice(0, 24);
         setRecentlyUpdated(recentData);
         setCache('home_recent', recentData);
@@ -240,39 +313,66 @@ export function Home() {
         setRecentlyUpdated(latestData.slice(0, 24));
       }
     }
-
+ 
     // Small delay
-    await new Promise(r => setTimeout(r, 600));
-
+    await new Promise(r => setTimeout(r, 200));
+ 
     // 3. Top anime (check cache first)
     try {
       let topData = getCached<AnimeData[]>('home_top');
       if (!topData) {
-        const res = await fetchWithRetry('https://api.jikan.moe/v4/top/anime?sfw=true&limit=10');
-        const rawList = res.data || [];
-        const seenIds = new Set<number>();
-        const uniqueList: AnimeData[] = [];
-        
-        for (const anime of rawList) {
-          if (!seenIds.has(anime.mal_id)) {
-            seenIds.add(anime.mal_id);
-            uniqueList.push(anime);
+        try {
+          const queryText = `
+            query {
+              Page(page: 1, perPage: 10) {
+                media(type: ANIME, isAdult: false, sort: [SCORE_DESC]) {
+                  idMal
+                  title { romaji english userPreferred }
+                  coverImage { large }
+                  averageScore
+                  seasonYear
+                  season
+                  episodes
+                }
+              }
+            }
+          `;
+          const response = await fetch('https://graphql.anilist.co', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: queryText })
+          });
+          const resData = await response.json();
+          const media = resData?.data?.Page?.media || [];
+          topData = mapAniListMedia(media);
+        } catch (topErr) {
+          console.error('Failed to fetch top anime via AniList, trying Jikan...', topErr);
+          const res = await fetchWithRetry('https://api.jikan.moe/v4/top/anime?sfw=true&limit=10');
+          const rawList = res.data || [];
+          const seenIds = new Set<number>();
+          const uniqueList: AnimeData[] = [];
+          
+          for (const anime of rawList) {
+            if (!seenIds.has(anime.mal_id)) {
+              seenIds.add(anime.mal_id);
+              uniqueList.push(anime);
+            }
           }
+          topData = uniqueList;
         }
-        topData = uniqueList;
         setCache('home_top', topData);
       }
       setTopAnime(topData || []);
     } catch (err) {
       console.error('Failed to fetch top anime data:', err);
     }
-
+ 
     // Only show error if both main sections completely failed to load
-    if (latestData.length === 0) {
+    if (latestData.length === 0 && recentlyUpdated.length === 0) {
       setError('Failed to load anime data. Please refresh the page.');
     }
     setLoading(false);
-  }, []);
+  }, [recentlyUpdated]);
 
   // Fetch anime data ONCE on mount (no dependency on user)
   useEffect(() => {

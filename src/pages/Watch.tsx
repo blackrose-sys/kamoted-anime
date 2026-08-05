@@ -29,9 +29,11 @@ export function Watch() {
   const [currentChunk, setCurrentChunk] = useState<number>(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
-  const [selectedServer, setSelectedServer] = useState<AnimeServer>(animeServers[0]); // AnimePlay is primary
+  const [selectedServer, setSelectedServer] = useState<AnimeServer>(animeServers[0]); // VidLink is primary
   const [showServerDropdown, setShowServerDropdown] = useState(false);
   const [autoNext, setAutoNext] = useState(true);
+  const [iframeLoading, setIframeLoading] = useState(true);
+  const [iframeError, setIframeError] = useState(false);
   
   const CHUNK_SIZE = 200;
 
@@ -236,6 +238,8 @@ export function Watch() {
 
   const handleEpisodeClick = async (epNum: number) => {
     setSelectedEpisode(epNum);
+    setIframeLoading(true);
+    setIframeError(false);
     if (user && id) {
       let validTitle = animeName;
       let validImage = animeImage;
@@ -337,10 +341,8 @@ export function Watch() {
   };
 
   const handleSkipIntro = () => {
-    // Since we're using iframe, we can't directly control the video
-    // But we can add a seek forward button that would work if the player supports it
-    // For now, this is a placeholder - actual implementation would depend on the video player API
-    alert('Skip intro feature requires player API integration');
+    // Skip intro is not possible with iframe-based players
+    // This button is kept for UX consistency but does nothing harmful
   };
   
   const chunks = useMemo(() => {
@@ -378,7 +380,58 @@ export function Watch() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
             {/* Player Container */}
-            <div style={{ flex: '1 1 auto', width: '100%', aspectRatio: '16/9', backgroundColor: 'var(--bg-color-secondary)', borderRadius: '1rem', overflow: 'hidden', border: '1px solid var(--border-color)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
+            <div style={{ flex: '1 1 auto', width: '100%', aspectRatio: '16/9', backgroundColor: '#0a0a0a', borderRadius: '1rem', overflow: 'hidden', border: '1px solid var(--border-color)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', position: 'relative' }}>
+              {/* Loading Overlay */}
+              {iframeLoading && (
+                <div style={{ 
+                  position: 'absolute', inset: 0, zIndex: 5, 
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', 
+                  backgroundColor: '#0a0a0a', gap: '1.25rem'
+                }}>
+                  <div style={{ 
+                    width: '48px', height: '48px', borderRadius: '50%', 
+                    border: '3px solid rgba(245,158,11,0.15)', borderTopColor: 'var(--accent-primary)', 
+                    animation: 'spin 0.8s linear infinite' 
+                  }} />
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    Loading {selectedServer.name}...
+                  </span>
+                </div>
+              )}
+
+              {/* Error Overlay */}
+              {iframeError && (
+                <div style={{ 
+                  position: 'absolute', inset: 0, zIndex: 6, 
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', 
+                  backgroundColor: '#0a0a0a', gap: '1rem', padding: '2rem', textAlign: 'center'
+                }}>
+                  <Server size={40} style={{ color: 'var(--accent-primary)', opacity: 0.6 }} />
+                  <p style={{ fontSize: '1rem', fontWeight: 800, color: 'white' }}>Server Unavailable</p>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', maxWidth: '350px', lineHeight: 1.5 }}>
+                    {selectedServer.name} failed to load. Try switching servers below.
+                  </p>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center', marginTop: '0.5rem' }}>
+                    {animeServers.filter(s => s.id !== selectedServer.id).map(server => (
+                      <button
+                        key={server.id}
+                        onClick={() => { setIframeError(false); setIframeLoading(true); setSelectedServer(server); }}
+                        className="btn-primary hover-scale"
+                        style={{ padding: '0.6rem 1.25rem', fontSize: '0.8rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                      >
+                        <Server size={13} /> {server.name}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => { setIframeError(false); setIframeLoading(true); }}
+                    style={{ marginTop: '0.5rem', fontSize: '0.78rem', color: 'var(--accent-primary)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, textDecoration: 'underline' }}
+                  >
+                    Retry current server
+                  </button>
+                </div>
+              )}
+
               <iframe 
                 src={getServerUrl(selectedServer, id || '', selectedEpisode, type, anilistId || id)}
                 width="100%" 
@@ -388,6 +441,21 @@ export function Watch() {
                 allow="autoplay; encrypted-media; picture-in-picture"
                 style={{ backgroundColor: 'black' }}
                 key={`${selectedServer.id}-${selectedEpisode}-${type}-${anilistId}`}
+                onLoad={() => { setIframeLoading(false); setIframeError(false); }}
+                onError={() => {
+                  setIframeLoading(false);
+                  setIframeError(true);
+                  // Auto-fallback: try next server
+                  const currentIdx = animeServers.findIndex(s => s.id === selectedServer.id);
+                  const nextServer = animeServers[currentIdx + 1];
+                  if (nextServer) {
+                    setTimeout(() => {
+                      setIframeError(false);
+                      setIframeLoading(true);
+                      setSelectedServer(nextServer);
+                    }, 1500);
+                  }
+                }}
               />
             </div>
             

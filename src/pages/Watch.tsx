@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Search, ChevronDown, BookmarkPlus, BookmarkCheck, Server, SkipForward, ChevronRight, ChevronLeft, ToggleLeft, ToggleRight, Check, Users } from 'lucide-react';
+import { ArrowLeft, Search, ChevronDown, BookmarkPlus, BookmarkCheck, Server, SkipForward, ChevronRight, ChevronLeft, ToggleLeft, ToggleRight, Check, Users, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { animeServers, getServerUrl, fetchAniListMetadata, getAnimeDetails, type AnimeServer } from '../lib/animeServers';
@@ -376,7 +376,26 @@ export function Watch() {
             <ArrowLeft size={16} /> Back to Browse
           </Link>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            {/* Server 2 Notice Banner */}
+            <div style={{
+              backgroundColor: 'rgba(245, 158, 11, 0.1)',
+              border: '1px solid rgba(245, 158, 11, 0.3)',
+              borderRadius: '0.85rem',
+              padding: '0.75rem 1.25rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              fontSize: '0.82rem',
+              color: '#fef08a',
+              fontWeight: 700
+            }}>
+              <AlertTriangle size={18} color="#f59e0b" style={{ flexShrink: 0 }} />
+              <div>
+                <strong>Notice:</strong> Server 1 (AnimePlay) is currently down. Video player is automatically defaulted to <span style={{ color: '#ffffff', textDecoration: 'underline', fontWeight: 900 }}>Server 2 (MegaPlay)</span> for smooth playback.
+              </div>
+            </div>
+
             {/* Player Container */}
             <div style={{ flex: '1 1 auto', width: '100%', aspectRatio: '16/9', backgroundColor: 'var(--bg-color-secondary)', borderRadius: '1rem', overflow: 'hidden', border: '1px solid var(--border-color)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
               <iframe 

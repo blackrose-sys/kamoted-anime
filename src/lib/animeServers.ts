@@ -9,34 +9,34 @@ export interface AnimeServer {
 
 export const animeServers: AnimeServer[] = [
   {
-    id: 'animeplay',
-    name: 'Server 1 (AnimePlay)',
-    baseUrl: 'https://animeplay.cfd/stream/mal',
+    id: 'megaplay-mal',
+    name: 'Server 2 (MegaPlay - Recommended)',
+    baseUrl: 'https://megaplay.buzz/stream/mal',
     requiresAnilist: false,
     format: 'iframe',
     priority: 0
   },
   {
-    id: 'megaplay-mal',
-    name: 'Server 2 (MegaPlay)',
-    baseUrl: 'https://megaplay.buzz/stream/mal',
-    requiresAnilist: false,
-    format: 'iframe',
-    priority: 1
-  },
-  {
     id: 'megaplay-ani',
-    name: 'Server 3 (AniList)',
+    name: 'Server 3 (MegaPlay AniList)',
     baseUrl: 'https://megaplay.buzz/stream/ani',
     requiresAnilist: true,
     format: 'iframe',
-    priority: 2
+    priority: 1
   },
   {
     id: '2anime',
     name: 'Server 4 (2Anime)',
     baseUrl: 'https://2anime.xyz/embed',
     requiresAnilist: true,
+    format: 'iframe',
+    priority: 2
+  },
+  {
+    id: 'animeplay',
+    name: 'Server 1 (AnimePlay - Offline)',
+    baseUrl: 'https://animeplay.cfd/stream/mal',
+    requiresAnilist: false,
     format: 'iframe',
     priority: 3
   },

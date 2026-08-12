@@ -1,4 +1,4 @@
-import { Tv, Search, Check, LogOut, User as UserIcon, Calendar, Newspaper, List, Menu, X, Mail } from 'lucide-react';
+import { Tv, Search, Check, LogOut, User as UserIcon, Calendar, Newspaper, List, Menu, X, Mail, AlertTriangle } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -18,8 +18,19 @@ export function Navbar() {
   const [copied, setCopied] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showBanner, setShowBanner] = useState(true);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const isDismissed = sessionStorage.getItem('kamoted_announcement_dismissed');
+    if (isDismissed) setShowBanner(false);
+  }, []);
+
+  const handleDismissBanner = () => {
+    setShowBanner(false);
+    sessionStorage.setItem('kamoted_announcement_dismissed', 'true');
+  };
 
   const handleCopy = () => {
     navigator.clipboard.writeText('kamotedelight');
@@ -53,7 +64,58 @@ export function Navbar() {
 
   return (
     <>
-      <nav className="glass" style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50, height: 'var(--nav-height)', display: 'flex', alignItems: 'center' }}>
+      {/* Top System Announcement Banner */}
+      {showBanner && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 60,
+          backgroundColor: 'rgba(245, 158, 11, 0.15)',
+          borderBottom: '1px solid rgba(245, 158, 11, 0.35)',
+          color: '#fef08a',
+          padding: '0.5rem 1rem',
+          fontSize: '0.8rem',
+          fontWeight: 700,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '0.75rem',
+          backdropFilter: 'blur(12px)',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, justifyContent: 'center', textAlign: 'center' }}>
+            <span style={{
+              backgroundColor: '#f59e0b',
+              color: 'black',
+              padding: '0.1rem 0.5rem',
+              borderRadius: '9999px',
+              fontSize: '0.68rem',
+              fontWeight: 900,
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.25rem'
+            }}>
+              <AlertTriangle size={12} color="black" /> NOTICE
+            </span>
+            <span>
+              Server 1 (AnimePlay) is currently down. Please use <strong style={{ color: '#ffffff', textDecoration: 'underline' }}>Server 2 (MegaPlay)</strong> for video streaming!
+            </span>
+          </div>
+          <button 
+            onClick={handleDismissBanner}
+            style={{ background: 'none', border: 'none', color: '#fef08a', cursor: 'pointer', opacity: 0.8, padding: '0.2rem', display: 'flex', alignItems: 'center' }}
+            title="Dismiss notice"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      <nav className="glass" style={{ position: 'fixed', top: showBanner ? '36px' : 0, left: 0, right: 0, zIndex: 50, height: 'var(--nav-height)', display: 'flex', alignItems: 'center', transition: 'top 0.2s ease' }}>
         <div className="container flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3 hover-scale" onClick={() => setMobileMenuOpen(false)}>
             <Tv color="var(--accent-primary)" size={28} className="logo-icon" />

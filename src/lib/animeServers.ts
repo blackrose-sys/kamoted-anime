@@ -9,34 +9,34 @@ export interface AnimeServer {
 
 export const animeServers: AnimeServer[] = [
   {
-    id: 'vidlink',
-    name: 'Server 1 (VidLink)',
-    baseUrl: 'https://vidlink.pro/anime',
+    id: 'animeplay',
+    name: 'Server 1 (AnimePlay)',
+    baseUrl: 'https://animeplay.cfd/stream/mal',
     requiresAnilist: false,
     format: 'iframe',
     priority: 0
   },
   {
-    id: '2anime',
-    name: 'Server 2 (2Anime)',
-    baseUrl: 'https://2anime.xyz/embed',
-    requiresAnilist: true,
+    id: 'megaplay-mal',
+    name: 'Server 2 (MegaPlay)',
+    baseUrl: 'https://megaplay.buzz/stream/mal',
+    requiresAnilist: false,
     format: 'iframe',
     priority: 1
   },
   {
-    id: 'vidlink-alt',
-    name: 'Server 3 (VidLink Alt)',
-    baseUrl: 'https://vidlink.pro/anime',
-    requiresAnilist: false,
+    id: 'megaplay-ani',
+    name: 'Server 3 (AniList)',
+    baseUrl: 'https://megaplay.buzz/stream/ani',
+    requiresAnilist: true,
     format: 'iframe',
     priority: 2
   },
   {
-    id: 'embtaku',
-    name: 'Server 4 (EmbeD)',
-    baseUrl: 'https://embtaku.pro/streaming.php',
-    requiresAnilist: false,
+    id: '2anime',
+    name: 'Server 4 (2Anime)',
+    baseUrl: 'https://2anime.xyz/embed',
+    requiresAnilist: true,
     format: 'iframe',
     priority: 3
   },
@@ -177,21 +177,21 @@ export function getServerUrl(
   const effectiveAnilistId = anilistId || malId;
   
   switch (server.id) {
-    case 'vidlink':
-      // https://vidlink.pro/anime/{malId}/{episode}/{sub|dub}
+    case 'animeplay':
+      // https://animeplay.cfd/stream/mal/{malId}/{episode}/{sub|dub}
       return `${server.baseUrl}/${malId}/${episode}/${type}`;
+    
+    case 'megaplay-mal':
+      // https://megaplay.buzz/stream/mal/{malId}/{episode}/{sub|dub}
+      return `${server.baseUrl}/${malId}/${episode}/${type}`;
+    
+    case 'megaplay-ani':
+      // https://megaplay.buzz/stream/ani/{anilistId}/{episode}/{sub|dub}
+      return `${server.baseUrl}/${effectiveAnilistId}/${episode}/${type}`;
     
     case '2anime':
       // https://2anime.xyz/embed/{anilistId}/{episode}
       return `${server.baseUrl}/${effectiveAnilistId}/${episode}`;
-    
-    case 'vidlink-alt':
-      // Same as vidlink but with different query params for alternative sources
-      return `${server.baseUrl}/${malId}/${episode}/${type}?primaryColor=f59e0b&secondaryColor=1a1a2e&autoplay=true`;
-    
-    case 'embtaku':
-      // EmbeD uses a different format — we construct a search-style query
-      return `${server.baseUrl}?id=${malId}&episode=${episode}&type=${type}`;
     
     default:
       return `${server.baseUrl}/${malId}/${episode}/${type}`;
@@ -201,20 +201,22 @@ export function getServerUrl(
 export async function fetchEpisodesFromServer(
   id: string
 ): Promise<number | null> {
-  // Use AniList as the primary source for episode counts (more reliable)
   try {
-    const metadata = await fetchAniListMetadata(id);
-    if (metadata.episodes) return metadata.episodes;
-  } catch { /* ignore */ }
-
-  // Fallback to Jikan
-  try {
-    const res = await fetch(`https://api.jikan.moe/v4/anime/${id}`);
-    if (res.ok) {
-      const data = await res.json();
-      if (data?.data?.episodes) return data.data.episodes;
-    }
-  } catch { /* ignore */ }
-  
-  return null;
+    const cacheBuster = Date.now();
+    const apiUrl = `https://animeplay.cfd/api/anime/${id}?_=${cacheBuster}`;
+    const response = await fetch(apiUrl);
+    const data = await response.json();
+    
+    if (data?.episodes) return data.episodes;
+    if (data?.totalEpisodes) return data.totalEpisodes;
+    if (data?.data?.episodes) return data.data.episodes;
+    if (data?.data?.total_episodes) return data.data.total_episodes;
+    if (Array.isArray(data?.episodes)) return data.episodes.length;
+    if (Array.isArray(data?.data)) return data.data.length;
+    
+    return null;
+  } catch (error) {
+    console.error('Error fetching episodes from server API:', error);
+    return null;
+  }
 }

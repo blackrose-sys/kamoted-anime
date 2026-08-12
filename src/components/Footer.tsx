@@ -32,6 +32,7 @@ export function Footer() {
               <Link to="/contact" className="hover:text-accent-primary transition-colors">Get in Touch</Link>
               <Link to="/news" className="hover:text-accent-primary transition-colors">Anime News</Link>
               <Link to="/lists" className="hover:text-accent-primary transition-colors">Community Playlists</Link>
+              <Link to="/privacy" className="hover:text-accent-primary transition-colors">Privacy Policy</Link>
             </div>
           </div>
         </div>

@@ -509,42 +509,53 @@ export function Home() {
     <main style={{ flex: 1, paddingBottom: '4rem' }}>
       <Hero featured={latestAnime.slice(0, 5)} />
       
-      <div className="container home-layout" style={{ padding: '4rem 1.5rem', display: 'flex', flexDirection: 'row', gap: '2rem', flexWrap: 'wrap' }}>
+      <div className="container home-layout" style={{ padding: '3rem 1.5rem 4rem', display: 'flex', flexDirection: 'row', gap: '2.5rem', flexWrap: 'wrap' }}>
         
         {/* Main Content */}
         <div className="home-main-content" style={{ flex: '3 1 70%' }}>
 
           {/* Error State */}
           {error && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1.5rem', backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '1rem', marginBottom: '2rem' }}>
-              <AlertCircle size={24} color="#ef4444" />
-              <span style={{ color: '#fca5a5', flex: 1 }}>{error}</span>
-              <button onClick={fetchAnimeData} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem' }}>
-                <RefreshCw size={16} /> Retry
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1.25rem 1.5rem', backgroundColor: 'rgba(239, 68, 68, 0.06)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '1rem', marginBottom: '2rem' }}>
+              <AlertCircle size={20} color="#ef4444" />
+              <span style={{ color: '#fca5a5', flex: 1, fontSize: '0.88rem', fontWeight: 600 }}>{error}</span>
+              <button onClick={fetchAnimeData} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', fontSize: '0.8rem' }}>
+                <RefreshCw size={14} /> Retry
               </button>
             </div>
           )}
           
           {/* Continue Watching Section */}
           {history.length > 0 && (
-            <section style={{ marginBottom: '4rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '2rem' }}>
-                <h2 style={{ fontSize: '1.5rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '-0.05em' }}>Continue Watching</h2>
+            <section style={{ marginBottom: '3.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{ width: '4px', height: '24px', borderRadius: '9999px', background: 'linear-gradient(180deg, var(--accent-primary), transparent)' }} />
+                  <h2 style={{ fontSize: '1.35rem', fontWeight: 900, letterSpacing: '-0.02em' }}>Continue Watching</h2>
+                </div>
               </div>
               
               <div className="grid">
-                {history.map(item => (
-                  <Link to={`/watch/${item.anime_id}`} key={item.id} className="hover-scale" style={{ display: 'block', backgroundColor: 'var(--bg-color-secondary)', borderRadius: '0.75rem', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+                {history.map((item, idx) => (
+                  <Link to={`/watch/${item.anime_id}`} key={item.id} className="hover-scale" style={{ 
+                    display: 'block', 
+                    backgroundColor: 'var(--bg-color-secondary)', 
+                    borderRadius: '0.75rem', 
+                    overflow: 'hidden', 
+                    border: '1px solid var(--border-color)',
+                    animation: `fadeSlideUp 0.4s ease-out ${idx * 0.05}s both`,
+                  }}>
                     <div style={{ width: '100%', aspectRatio: '2/3', position: 'relative' }}>
                       <img src={item.image_url} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
-                      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0.5rem', background: 'linear-gradient(transparent, rgba(0,0,0,0.9))' }}>
-                        <span style={{ backgroundColor: 'var(--accent-primary)', color: 'black', padding: '0.1rem 0.5rem', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 800 }}>EP {item.last_episode}</span>
+                      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(transparent 40%, rgba(0,0,0,0.85))' }} />
+                      <div style={{ position: 'absolute', bottom: '0.5rem', left: '0.5rem', right: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ backgroundColor: 'var(--accent-primary)', color: 'black', padding: '0.15rem 0.5rem', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 800 }}>EP {item.last_episode}</span>
                       </div>
-                      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', opacity: 0.8 }}>
-                        <Play size={40} color="var(--accent-primary)" fill="var(--accent-primary)" />
+                      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid rgba(245,158,11,0.4)' }}>
+                        <Play size={20} color="var(--accent-primary)" fill="var(--accent-primary)" />
                       </div>
                     </div>
-                    <div style={{ padding: '0.5rem' }}>
+                    <div style={{ padding: '0.6rem 0.5rem' }}>
                       <h3 style={{ fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</h3>
                     </div>
                   </Link>
@@ -555,9 +566,14 @@ export function Home() {
 
           {/* Recently Updated Section */}
           <section>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '2rem' }}>
-              <h2 style={{ fontSize: '1.5rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '-0.05em' }}>Recently Updated</h2>
-              <Link to="/browse?tab=recent" style={{ color: 'var(--accent-primary)', fontSize: '0.875rem', fontWeight: 700 }}>View All</Link>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ width: '4px', height: '24px', borderRadius: '9999px', background: 'linear-gradient(180deg, #22c55e, transparent)' }} />
+                <h2 style={{ fontSize: '1.35rem', fontWeight: 900, letterSpacing: '-0.02em' }}>Recently Updated</h2>
+              </div>
+              <Link to="/browse?tab=recent" style={{ color: 'var(--accent-primary)', fontSize: '0.8rem', fontWeight: 800, textDecoration: 'none', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '0.3rem', transition: 'opacity 0.2s' }}>
+                View All →
+              </Link>
             </div>
 
             {loading ? (
@@ -576,10 +592,15 @@ export function Home() {
           </section>
 
           {/* Latest This Season */}
-          <section style={{ marginTop: '4rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '2rem' }}>
-              <h2 style={{ fontSize: '1.5rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '-0.05em' }}>Latest This Season</h2>
-              <Link to="/browse?tab=season" style={{ color: 'var(--accent-primary)', fontSize: '0.875rem', fontWeight: 700 }}>View All</Link>
+          <section style={{ marginTop: '3.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ width: '4px', height: '24px', borderRadius: '9999px', background: 'linear-gradient(180deg, #8b5cf6, transparent)' }} />
+                <h2 style={{ fontSize: '1.35rem', fontWeight: 900, letterSpacing: '-0.02em' }}>Latest This Season</h2>
+              </div>
+              <Link to="/browse?tab=season" style={{ color: 'var(--accent-primary)', fontSize: '0.8rem', fontWeight: 800, textDecoration: 'none', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                View All →
+              </Link>
             </div>
 
             {loading ? (
@@ -602,24 +623,67 @@ export function Home() {
         <aside className="home-sidebar" style={{ flex: '1 1 25%', minWidth: '300px', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
           
           {/* Top Anime Card */}
-          <div style={{ backgroundColor: 'var(--bg-color-secondary)', borderRadius: '1rem', padding: '1.5rem', border: '1px solid var(--border-color)' }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '-0.05em', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '1rem' }}>Top Anime</h2>
+          <div style={{ 
+            backgroundColor: 'rgba(10, 10, 15, 0.6)', 
+            borderRadius: '1.25rem', 
+            padding: '1.5rem', 
+            border: '1px solid var(--border-color)',
+            backdropFilter: 'blur(12px)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem' }}>
+              <div style={{ width: '4px', height: '20px', borderRadius: '9999px', background: 'linear-gradient(180deg, var(--accent-primary), transparent)' }} />
+              <h2 style={{ fontSize: '1.1rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.02em' }}>Top Anime</h2>
+            </div>
             
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
               {loading ? (
                  [1,2,3,4,5].map(i => (
                   <div key={i} className="animate-pulse" style={{ height: '60px', backgroundColor: 'var(--bg-color-tertiary)', borderRadius: '0.5rem' }}></div>
                 ))
               ) : (
                 topAnime.map((anime, idx) => (
-                  <Link to={`/watch/${anime.mal_id}`} key={anime.mal_id} className="hover-scale" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 900, color: idx < 3 ? 'var(--accent-primary)' : 'var(--text-secondary)', minWidth: '30px' }}>
+                  <Link 
+                    to={`/watch/${anime.mal_id}`} 
+                    key={anime.mal_id} 
+                    className="hover-scale" 
+                    style={{ 
+                      display: 'flex', 
+                      gap: '0.85rem', 
+                      alignItems: 'center', 
+                      padding: '0.45rem',
+                      borderRadius: '0.65rem',
+                      transition: 'all 0.25s ease',
+                      backgroundColor: 'transparent',
+                    }}
+                    onMouseOver={e => { (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(255,255,255,0.03)'; }}
+                    onMouseOut={e => { (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'; }}
+                  >
+                    <div style={{ 
+                      fontSize: '1.2rem', 
+                      fontWeight: 900, 
+                      color: idx === 0 ? '#facc15' : idx === 1 ? '#d1d5db' : idx === 2 ? '#cd7f32' : 'var(--text-secondary)', 
+                      minWidth: '28px',
+                      textAlign: 'center',
+                      textShadow: idx < 3 ? '0 0 8px currentColor' : 'none'
+                    }}>
                       {idx + 1}
                     </div>
-                    <img src={anime.images?.webp?.large_image_url || anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url || ''} alt={anime.title} style={{ width: '40px', height: '60px', objectFit: 'cover', borderRadius: '0.25rem' }} loading="lazy" />
+                    <img 
+                      src={anime.images?.webp?.large_image_url || anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url || ''} 
+                      alt={anime.title} 
+                      style={{ width: '42px', height: '60px', objectFit: 'cover', borderRadius: '0.35rem', border: '1px solid var(--border-color)' }} 
+                      loading="lazy" 
+                    />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <h4 style={{ fontSize: '0.875rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{anime.title}</h4>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Score: {anime.score || 'N/A'}</div>
+                      <h4 style={{ fontSize: '0.82rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: '0.15rem' }}>{anime.title}</h4>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        {anime.score && (
+                          <span style={{ color: '#facc15', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                            ★ {anime.score}
+                          </span>
+                        )}
+                        {anime.episodes && <span>• {anime.episodes} eps</span>}
+                      </div>
                     </div>
                   </Link>
                 ))
@@ -629,11 +693,20 @@ export function Home() {
 
           {/* Friends Activity Widget */}
           {user && friendActivity.length > 0 && (
-            <div style={{ backgroundColor: 'var(--bg-color-secondary)', borderRadius: '1rem', padding: '1.5rem', border: '1px solid var(--border-color)' }}>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '-0.05em', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                👥 Friends Activity
-              </h2>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div style={{ 
+              backgroundColor: 'rgba(10, 10, 15, 0.6)', 
+              borderRadius: '1.25rem', 
+              padding: '1.5rem', 
+              border: '1px solid var(--border-color)',
+              backdropFilter: 'blur(12px)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem' }}>
+                <div style={{ width: '4px', height: '20px', borderRadius: '9999px', background: 'linear-gradient(180deg, #06b6d4, transparent)' }} />
+                <h2 style={{ fontSize: '1.1rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                  Friends Activity
+                </h2>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
                 {friendActivity.map((activity, idx) => (
                   <div key={`act-${activity.id}-${idx}`} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
                     <Link to={`/user/${activity.profile.username}`} style={{ textDecoration: 'none' }}>
@@ -648,7 +721,8 @@ export function Home() {
                         fontWeight: 900,
                         fontSize: '0.75rem',
                         color: 'white',
-                        overflow: 'hidden'
+                        overflow: 'hidden',
+                        border: '2px solid rgba(255,255,255,0.1)'
                       }}>
                         {activity.profile.avatar_url ? (
                           <img src={activity.profile.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -692,3 +766,4 @@ export function Home() {
     </main>
   );
 }
+

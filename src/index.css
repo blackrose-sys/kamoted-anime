@@ -603,3 +603,9 @@ button {
   0% { background-position: 0 0; }
   100% { background-position: 0 100vh; }
 }
+
+/* Hero carousel progress bar */
+@keyframes heroProgress {
+  from { width: 0%; }
+  to { width: 100%; }
+}

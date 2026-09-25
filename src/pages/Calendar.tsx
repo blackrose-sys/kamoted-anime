@@ -75,9 +75,22 @@ export function Calendar() {
       setLoading(true);
       setError(null);
 
+      // Check cache first
+      try {
+        const cached = sessionStorage.getItem('calendar_schedules');
+        if (cached) {
+          const { data: cachedData, ts } = JSON.parse(cached);
+          if (Date.now() - ts < 10 * 60 * 1000) { // 10 min cache
+            setSchedules(cachedData);
+            setLoading(false);
+            return;
+          }
+        }
+      } catch { /* ignore */ }
+
       const query = `
-        query ($airingAtGreater: Int, $airingAtLesser: Int) {
-          Page(page: 1, perPage: 50) {
+        query ($page: Int, $airingAtGreater: Int, $airingAtLesser: Int) {
+          Page(page: $page, perPage: 50) {
             airingSchedules(airingAt_greater: $airingAtGreater, airingAt_lesser: $airingAtLesser, sort: TIME) {
               id
               episode
@@ -85,6 +98,7 @@ export function Calendar() {
               media {
                 id
                 idMal
+                isAdult
                 title {
                   userPreferred
                   english
@@ -105,40 +119,75 @@ export function Calendar() {
       const sevenDaysLater = now + (7 * 24 * 60 * 60);
 
       try {
-        const response = await fetch('https://graphql.anilist.co', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            query,
-            variables: {
-              airingAtGreater: now - 3600, // Include what aired in the last hour
-              airingAtLesser: sevenDaysLater
-            }
-          })
-        });
+        // Fetch 2 pages for better coverage
+        const allSchedules: AiringSchedule[] = [];
+        
+        for (let page = 1; page <= 2; page++) {
+          const response = await fetch('https://graphql.anilist.co', {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: JSON.stringify({
+              query,
+              variables: {
+                page,
+                airingAtGreater: now - 3600,
+                airingAtLesser: sevenDaysLater
+              }
+            })
+          });
 
-        if (!response.ok) {
-          throw new Error('Network response was not ok');
+          if (!response.ok) {
+            throw new Error(`AniList HTTP ${response.status}`);
+          }
+
+          const data = await response.json();
+          
+          if (data.errors) {
+            console.warn('AniList GraphQL errors:', data.errors);
+            throw new Error(data.errors[0]?.message || 'GraphQL error');
+          }
+
+          const rawList = data?.data?.Page?.airingSchedules || [];
+          // Filter out adult content and entries without MAL ID
+          const filtered = rawList.filter((s: any) => s.media && !s.media.isAdult && s.media.idMal);
+          allSchedules.push(...filtered);
+          
+          if (rawList.length < 50) break; // No more pages
+          
+          // Small delay between pages
+          if (page < 2) await new Promise(r => setTimeout(r, 300));
         }
 
-        const data = await response.json();
-        const rawList = data?.data?.Page?.airingSchedules || [];
-        setSchedules(rawList);
+        // Deduplicate by media id
+        const seen = new Set<number>();
+        const unique = allSchedules.filter(s => {
+          if (seen.has(s.media.id)) return false;
+          seen.add(s.media.id);
+          return true;
+        });
+
+        setSchedules(unique);
+        
+        // Cache
+        try {
+          sessionStorage.setItem('calendar_schedules', JSON.stringify({ data: unique, ts: Date.now() }));
+        } catch { /* storage full */ }
       } catch (err) {
         console.warn('AniList airing query failed, trying Jikan schedules fallback...', err);
         // Fallback to Jikan schedules
         try {
-          const fallbackRes = await fetch('https://api.jikan.moe/v4/schedules?limit=50');
+          const today = daysOfWeek[new Date().getDay()].toLowerCase();
+          const fallbackRes = await fetch(`https://api.jikan.moe/v4/schedules?filter=${today}&limit=50&sfw=true`);
           const fallbackData = await fallbackRes.json();
-          if (fallbackData && fallbackData.data) {
-            // Map Jikan schedule structure to fit the component requirements
-            const mapped = fallbackData.data.map((item: any) => {
-              // Estimate an airingAt time for countdowns (since Jikan doesn't provide precise unix epoch for next episode)
-              // Just use now + some offset or set to now
+          if (fallbackData && fallbackData.data && fallbackData.data.length > 0) {
+            const mapped = fallbackData.data.map((item: any, idx: number) => {
               return {
-                id: item.mal_id,
-                episode: 1, // Placeholder
-                airingAt: Math.floor(Date.now() / 1000) + 12 * 3600, // Estimate 12h
+                id: item.mal_id || idx,
+                episode: 1,
+                airingAt: Math.floor(Date.now() / 1000) + (idx * 1800), // Stagger times
                 media: {
                   id: item.mal_id,
                   idMal: item.mal_id,
@@ -148,7 +197,7 @@ export function Calendar() {
                     romaji: item.title_japanese || null
                   },
                   coverImage: {
-                    large: item.images?.webp?.large_image_url || item.images?.webp?.image_url || ''
+                    large: item.images?.webp?.large_image_url || item.images?.webp?.image_url || item.images?.jpg?.image_url || ''
                   },
                   genres: item.genres?.map((g: any) => g.name) || []
                 }
@@ -156,11 +205,11 @@ export function Calendar() {
             });
             setSchedules(mapped);
           } else {
-            setError('Failed to load release calendar.');
+            setError('No schedule data available. Try refreshing.');
           }
         } catch (jikanErr) {
-          console.error(jikanErr);
-          setError('Failed to load release calendar. Please check your network or disable adblock.');
+          console.error('Jikan fallback also failed:', jikanErr);
+          setError('Failed to load release calendar. Check your network connection or try disabling ad-blockers.');
         }
       } finally {
         setLoading(false);

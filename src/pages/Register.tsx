@@ -11,6 +11,7 @@ export function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const navigate = useNavigate();
 
   // Password strength checks
@@ -19,7 +20,7 @@ export function Register() {
     match: password.length > 0 && password === confirmPassword,
   };
 
-  const isFormValid = username.length >= 3 && email.includes('@') && checks.length && checks.match;
+  const isFormValid = username.length >= 3 && email.includes('@') && checks.length && checks.match && agreedToTerms;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -247,6 +248,27 @@ export function Register() {
               )}
             </div>
           )}
+
+          {/* Terms Agreement */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', marginTop: '0.25rem' }}>
+            <input
+              type="checkbox"
+              id="agree-terms"
+              checked={agreedToTerms}
+              onChange={e => setAgreedToTerms(e.target.checked)}
+              style={{ 
+                marginTop: '3px', 
+                accentColor: 'var(--accent-primary)',
+                width: '16px',
+                height: '16px',
+                cursor: 'pointer',
+                flexShrink: 0
+              }}
+            />
+            <label htmlFor="agree-terms" style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.5, cursor: 'pointer', fontWeight: 500 }}>
+              I agree to the <Link to="/terms" target="_blank" style={{ color: 'var(--accent-primary)', fontWeight: 700, textDecoration: 'underline' }}>Terms of Service</Link> and <Link to="/privacy" target="_blank" style={{ color: 'var(--accent-primary)', fontWeight: 700, textDecoration: 'underline' }}>Privacy Policy</Link>
+            </label>
+          </div>
           
           <button 
             type="submit" 

@@ -33,6 +33,7 @@ export function Footer() {
               <Link to="/news" className="hover:text-accent-primary transition-colors">Anime News</Link>
               <Link to="/lists" className="hover:text-accent-primary transition-colors">Community Playlists</Link>
               <Link to="/privacy" className="hover:text-accent-primary transition-colors">Privacy Policy</Link>
+              <Link to="/terms" className="hover:text-accent-primary transition-colors">Terms of Service</Link>
             </div>
           </div>
         </div>

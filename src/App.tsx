@@ -17,6 +17,7 @@ import { WatchRoom } from './pages/WatchRoom';
 import { Lists } from './pages/Lists';
 import { Contact } from './pages/Contact';
 import { PrivacyPolicy } from './pages/PrivacyPolicy';
+import { TermsOfService } from './pages/TermsOfService';
 import { AmbientPlayer } from './components/AmbientPlayer';
 import { AuthProvider } from './context/AuthContext';
 import { useEffect } from 'react';
@@ -95,6 +96,7 @@ function App() {
             <Route path="/room/:roomId" element={<WatchRoom />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/terms" element={<TermsOfService />} />
           </Routes>
           <Footer />
           <AmbientPlayer />

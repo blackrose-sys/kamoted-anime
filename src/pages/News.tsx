@@ -65,7 +65,7 @@ const mapAniListToNewsAnime = (media: any): NewsAnime => {
   return {
     mal_id: media.idMal,
     title: media.title.english || media.title.userPreferred || media.title.romaji,
-    image_url: media.coverImage.large,
+    image_url: media.coverImage.extraLarge || media.coverImage.large,
     score: media.averageScore ? media.averageScore / 10 : null,
     synopsis: cleanSynopsis,
     episodes: media.episodes || null,
@@ -112,7 +112,7 @@ export function News() {
               media(status: RELEASING, type: ANIME, isAdult: false, sort: [POPULARITY_DESC]) {
                 idMal
                 title { romaji english userPreferred }
-                coverImage { large }
+                coverImage { extraLarge large }
                 averageScore
                 seasonYear
                 season
@@ -151,7 +151,7 @@ export function News() {
               media(status: NOT_YET_RELEASED, type: ANIME, isAdult: false, sort: [POPULARITY_DESC]) {
                 idMal
                 title { romaji english userPreferred }
-                coverImage { large }
+                coverImage { extraLarge large }
                 averageScore
                 seasonYear
                 season
@@ -190,7 +190,7 @@ export function News() {
               media(season: $season, seasonYear: $seasonYear, type: ANIME, isAdult: false, sort: [POPULARITY_DESC]) {
                 idMal
                 title { romaji english userPreferred }
-                coverImage { large }
+                coverImage { extraLarge large }
                 averageScore
                 seasonYear
                 season

@@ -76,12 +76,12 @@ const mapAniListMedia = (mediaList: any[]): AnimeData[] => {
       title: m.title.english || m.title.userPreferred || m.title.romaji,
       images: {
         jpg: {
-          image_url: m.coverImage.large,
-          large_image_url: m.coverImage.large
+          image_url: m.coverImage.extraLarge || m.coverImage.large,
+          large_image_url: m.coverImage.extraLarge || m.coverImage.large
         },
         webp: {
-          image_url: m.coverImage.large,
-          large_image_url: m.coverImage.large
+          image_url: m.coverImage.extraLarge || m.coverImage.large,
+          large_image_url: m.coverImage.extraLarge || m.coverImage.large
         }
       },
       score: m.averageScore ? m.averageScore / 10 : null,
@@ -121,7 +121,7 @@ export function Home() {
                 media(season: $season, seasonYear: $seasonYear, type: ANIME, isAdult: false, sort: [POPULARITY_DESC]) {
                   idMal
                   title { romaji english userPreferred }
-                  coverImage { large }
+                  coverImage { extraLarge large }
                   averageScore
                   seasonYear
                   season
@@ -188,6 +188,7 @@ export function Home() {
                     userPreferred
                   }
                   coverImage {
+                    extraLarge
                     large
                   }
                   averageScore
@@ -224,8 +225,8 @@ export function Home() {
             title: s.media.title.english || s.media.title.userPreferred || s.media.title.romaji,
             images: {
               jpg: {
-                image_url: s.media.coverImage.large,
-                large_image_url: s.media.coverImage.large
+                image_url: s.media.coverImage.extraLarge || s.media.coverImage.large,
+                large_image_url: s.media.coverImage.extraLarge || s.media.coverImage.large
               }
             },
             score: s.media.averageScore ? s.media.averageScore / 10 : null,
@@ -328,7 +329,7 @@ export function Home() {
                 media(type: ANIME, isAdult: false, sort: [SCORE_DESC]) {
                   idMal
                   title { romaji english userPreferred }
-                  coverImage { large }
+                  coverImage { extraLarge large }
                   averageScore
                   seasonYear
                   season

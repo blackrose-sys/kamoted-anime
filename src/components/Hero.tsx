@@ -12,6 +12,7 @@ export function Hero({ featured }: HeroProps) {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [descriptions, setDescriptions] = useState<Record<number, string>>({});
   const [genres, setGenres] = useState<Record<number, string[]>>({});
+  const [bannerImages, setBannerImages] = useState<Record<number, string>>({});
   const progressRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -25,6 +26,7 @@ export function Hero({ featured }: HeroProps) {
           Media(idMal: $idMal, type: ANIME) {
             description(asHtml: false)
             genres
+            bannerImage
           }
         }
       `;
@@ -45,6 +47,9 @@ export function Hero({ featured }: HeroProps) {
           }
           if (media?.genres) {
             setGenres(prev => ({ ...prev, [anime.mal_id]: media.genres.slice(0, 4) }));
+          }
+          if (media?.bannerImage) {
+            setBannerImages(prev => ({ ...prev, [anime.mal_id]: media.bannerImage }));
           }
         } catch { /* ignore */ }
       }
@@ -106,7 +111,7 @@ export function Hero({ featured }: HeroProps) {
       
       {/* Background Images with Ken Burns effect */}
       {featured.map((anime, index) => {
-        const bgImage = anime.trailer?.images?.maximum_image_url || anime.trailer?.images?.large_image_url || anime.images?.webp?.large_image_url || anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url || '';
+        const bgImage = bannerImages[anime.mal_id] || anime.trailer?.images?.maximum_image_url || anime.trailer?.images?.large_image_url || anime.images?.webp?.large_image_url || anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url || '';
         const isActive = index === currentIndex;
         return (
           <div 

@@ -15,6 +15,7 @@ interface AiringSchedule {
       romaji: string | null;
     };
     coverImage: {
+      extraLarge?: string;
       large: string;
     };
     genres: string[];
@@ -105,6 +106,7 @@ export function Calendar() {
                   romaji
                 }
                 coverImage {
+                  extraLarge
                   large
                 }
                 genres
@@ -329,7 +331,7 @@ export function Calendar() {
               >
                 {/* Anime Cover */}
                 <div style={{ width: '80px', aspectRatio: '2/3', borderRadius: '0.5rem', overflow: 'hidden', backgroundColor: 'var(--bg-color-tertiary)', flexShrink: 0 }}>
-                  <img src={s.media.coverImage.large} alt={s.media.title.userPreferred} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={s.media.coverImage.extraLarge || s.media.coverImage.large} alt={s.media.title.userPreferred} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
 
                 {/* Info */}

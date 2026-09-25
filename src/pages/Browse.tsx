@@ -42,12 +42,12 @@ const mapAniListMedia = (mediaList: any[]): AnimeData[] => {
       title: m.title.english || m.title.userPreferred || m.title.romaji,
       images: {
         jpg: {
-          image_url: m.coverImage.large,
-          large_image_url: m.coverImage.large
+          image_url: m.coverImage.extraLarge || m.coverImage.large,
+          large_image_url: m.coverImage.extraLarge || m.coverImage.large
         },
         webp: {
-          image_url: m.coverImage.large,
-          large_image_url: m.coverImage.large
+          image_url: m.coverImage.extraLarge || m.coverImage.large,
+          large_image_url: m.coverImage.extraLarge || m.coverImage.large
         }
       },
       score: m.averageScore ? m.averageScore / 10 : null,
@@ -107,6 +107,7 @@ export function Browse() {
                         userPreferred
                       }
                       coverImage {
+                        extraLarge
                         large
                       }
                       averageScore
@@ -143,8 +144,8 @@ export function Browse() {
                 title: s.media.title.english || s.media.title.userPreferred || s.media.title.romaji,
                 images: {
                   jpg: {
-                    image_url: s.media.coverImage.large,
-                    large_image_url: s.media.coverImage.large
+                    image_url: s.media.coverImage.extraLarge || s.media.coverImage.large,
+                    large_image_url: s.media.coverImage.extraLarge || s.media.coverImage.large
                   }
                 },
                 score: s.media.averageScore ? s.media.averageScore / 10 : null,
@@ -207,6 +208,7 @@ export function Browse() {
                       userPreferred
                     }
                     coverImage {
+                      extraLarge
                       large
                     }
                     averageScore
@@ -271,6 +273,7 @@ export function Browse() {
                       userPreferred
                     }
                     coverImage {
+                      extraLarge
                       large
                     }
                     averageScore
@@ -342,6 +345,7 @@ export function Browse() {
                       userPreferred
                     }
                     coverImage {
+                      extraLarge
                       large
                     }
                     averageScore

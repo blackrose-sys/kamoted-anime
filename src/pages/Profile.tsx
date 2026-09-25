@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Navigate, Link } from 'react-router-dom';
-import { Loader2, Bookmark, Clock, Trash2, Play, Camera, X, Check, Save, User, Mail, ZoomIn, ZoomOut, Globe, Lock, List, Shield, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
+import { Loader2, Bookmark, Clock, Trash2, Play, Camera, X, Check, Save, User, Mail, ZoomIn, ZoomOut, Globe, Lock, List, Shield, Eye, EyeOff, CheckCircle2, Crown, Ban, UserX, UserCheck as UserCheckIcon } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { getAnimeDetails } from '../lib/animeServers';
 import { UserBadge } from '../components/UserBadge';
+import { isOwner, fetchBannedUsers, banUser, unbanUser, type BannedUser } from '../lib/adminUtils';
 
 export function Profile() {
   const { user, updateUser, isLoading } = useAuth();
   
   // Tab management
-  const [activeTab, setActiveTab] = useState<'settings' | 'security' | 'watchlist' | 'history' | 'lists'>('settings');
+  const [activeTab, setActiveTab] = useState<'settings' | 'security' | 'watchlist' | 'history' | 'lists' | 'admin'>('settings');
+  const isAdmin = isOwner(user);
   const [watchlist, setWatchlist] = useState<any[]>([]);
   const [history, setHistory] = useState<any[]>([]);
   const [myLists, setMyLists] = useState<any[]>([]);
@@ -57,10 +59,24 @@ export function Profile() {
   const [securityError, setSecurityError] = useState('');
   const [securitySuccess, setSecuritySuccess] = useState(false);
 
+  // Admin panel state
+  const [bannedUsers, setBannedUsers] = useState<BannedUser[]>([]);
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [banTargetUsername, setBanTargetUsername] = useState('');
+  const [banReason, setBanReason] = useState('');
+  const [banDuration, setBanDuration] = useState<'permanent' | '1d' | '7d' | '30d'>('permanent');
+  const [banActionLoading, setBanActionLoading] = useState(false);
+  const [adminMessage, setAdminMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
   useEffect(() => {
     if (user) {
       setUsernameInput(user.username || '');
       setPrivacy(user.watchlist_privacy || 'public');
+
+      // Load banned users if admin
+      if (isOwner(user)) {
+        fetchBannedUsers().then(data => setBannedUsers(data));
+      }
       
       const loadGamificationStats = async () => {
         try {
@@ -365,7 +381,8 @@ export function Profile() {
           { id: 'watchlist' as const, label: 'WATCHLIST', icon: <Bookmark size={15} /> },
           { id: 'history' as const, label: 'HISTORY', icon: <Clock size={15} /> },
           { id: 'lists' as const, label: 'PLAYLISTS', icon: <List size={15} /> },
-          { id: 'security' as const, label: 'SECURITY', icon: <Shield size={15} /> }
+          { id: 'security' as const, label: 'SECURITY', icon: <Shield size={15} /> },
+          ...(isAdmin ? [{ id: 'admin' as const, label: 'ADMIN', icon: <Crown size={15} /> }] : [])
         ].map(tab => {
           const isActive = activeTab === tab.id;
           return (
@@ -1270,6 +1287,240 @@ export function Profile() {
           </div>
         </div>
       )}
+
+        {/* TAB: ADMIN (Owner Only) */}
+        {activeTab === 'admin' && isAdmin && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', maxWidth: '700px', width: '100%', margin: '0 auto' }}>
+            <div>
+              <h2 style={{ fontSize: '1.35rem', fontWeight: 900, marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Crown size={20} color="#f59e0b" /> Owner Control Panel
+              </h2>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 500, margin: 0 }}>Ban users, manage the platform, and flex your power. 👑</p>
+            </div>
+
+            {adminMessage && (
+              <div style={{ 
+                display: 'flex', alignItems: 'center', gap: '0.55rem', 
+                backgroundColor: adminMessage.type === 'success' ? 'rgba(34, 197, 94, 0.08)' : 'rgba(239, 68, 68, 0.08)', 
+                border: `1px solid ${adminMessage.type === 'success' ? 'rgba(34, 197, 94, 0.25)' : 'rgba(239, 68, 68, 0.25)'}`, 
+                color: adminMessage.type === 'success' ? '#86efac' : '#fca5a5', 
+                padding: '0.85rem 1.1rem', borderRadius: '0.75rem', fontSize: '0.85rem', fontWeight: 700 
+              }}>
+                {adminMessage.type === 'success' ? <Check size={16} /> : <X size={16} />}
+                {adminMessage.text}
+              </div>
+            )}
+
+            {/* Ban a User Form */}
+            <div style={{ 
+              backgroundColor: 'rgba(239, 68, 68, 0.04)', 
+              border: '1px solid rgba(239, 68, 68, 0.15)', 
+              borderRadius: '1rem', 
+              padding: '1.5rem',
+            }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 900, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#ef4444' }}>
+                <Ban size={16} /> Ban a User
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)', marginBottom: '0.35rem', display: 'block' }}>Username</label>
+                  <input 
+                    type="text" 
+                    value={banTargetUsername} 
+                    onChange={e => setBanTargetUsername(e.target.value)} 
+                    placeholder="Enter username to ban..."
+                    style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '0.65rem', border: '1px solid rgba(239,68,68,0.2)', backgroundColor: '#08080a', color: 'white', fontSize: '0.88rem', fontWeight: 600, outline: 'none' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)', marginBottom: '0.35rem', display: 'block' }}>Reason</label>
+                  <input 
+                    type="text" 
+                    value={banReason} 
+                    onChange={e => setBanReason(e.target.value)} 
+                    placeholder="Being cringe, trolling, etc."
+                    style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '0.65rem', border: '1px solid rgba(239,68,68,0.2)', backgroundColor: '#08080a', color: 'white', fontSize: '0.88rem', fontWeight: 600, outline: 'none' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)', marginBottom: '0.35rem', display: 'block' }}>Duration</label>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {[
+                      { id: 'permanent' as const, label: 'Permanent ☠️' },
+                      { id: '1d' as const, label: '1 Day' },
+                      { id: '7d' as const, label: '7 Days' },
+                      { id: '30d' as const, label: '30 Days' },
+                    ].map(opt => (
+                      <button
+                        key={opt.id}
+                        onClick={() => setBanDuration(opt.id)}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          borderRadius: '0.5rem',
+                          border: `1px solid ${banDuration === opt.id ? '#ef4444' : 'rgba(255,255,255,0.1)'}`,
+                          backgroundColor: banDuration === opt.id ? 'rgba(239,68,68,0.15)' : 'transparent',
+                          color: banDuration === opt.id ? '#ef4444' : 'var(--text-secondary)',
+                          fontSize: '0.8rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <button
+                  disabled={!banTargetUsername.trim() || banActionLoading}
+                  onClick={async () => {
+                    setBanActionLoading(true);
+                    setAdminMessage(null);
+                    try {
+                      // Look up the user by username
+                      const { data: targetProfile } = await supabase
+                        .from('profiles')
+                        .select('id, username')
+                        .ilike('username', banTargetUsername.trim())
+                        .maybeSingle();
+
+                      if (!targetProfile) {
+                        setAdminMessage({ type: 'error', text: `User "${banTargetUsername}" not found.` });
+                        setBanActionLoading(false);
+                        return;
+                      }
+
+                      // Calculate expiry
+                      let expiresAt: string | null = null;
+                      if (banDuration !== 'permanent') {
+                        const days = banDuration === '1d' ? 1 : banDuration === '7d' ? 7 : 30;
+                        const exp = new Date();
+                        exp.setDate(exp.getDate() + days);
+                        expiresAt = exp.toISOString();
+                      }
+
+                      const result = await banUser(
+                        targetProfile.id,
+                        targetProfile.username,
+                        banReason.trim() || 'Banned by the GOAT 🐐',
+                        user!.id,
+                        expiresAt
+                      );
+
+                      if (result.success) {
+                        setAdminMessage({ type: 'success', text: `🔨 ${targetProfile.username} has been BANNED! ${banDuration === 'permanent' ? 'PERMANENTLY.' : `For ${banDuration}.`}` });
+                        setBanTargetUsername('');
+                        setBanReason('');
+                        // Refresh banned list
+                        const updated = await fetchBannedUsers();
+                        setBannedUsers(updated);
+                      } else {
+                        setAdminMessage({ type: 'error', text: result.error || 'Failed to ban user.' });
+                      }
+                    } catch (err: any) {
+                      setAdminMessage({ type: 'error', text: err.message });
+                    }
+                    setBanActionLoading(false);
+                  }}
+                  style={{
+                    padding: '0.85rem 1.5rem',
+                    borderRadius: '0.75rem',
+                    border: 'none',
+                    background: !banTargetUsername.trim() ? 'rgba(239,68,68,0.2)' : 'linear-gradient(135deg, #ef4444, #dc2626)',
+                    color: 'white',
+                    fontSize: '0.88rem',
+                    fontWeight: 900,
+                    cursor: !banTargetUsername.trim() ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    opacity: !banTargetUsername.trim() ? 0.5 : 1,
+                    transition: 'all 0.2s',
+                    marginTop: '0.5rem'
+                  }}
+                >
+                  {banActionLoading ? <Loader2 className="animate-spin" size={16} /> : <Ban size={16} />}
+                  {banActionLoading ? 'Banning...' : 'DROP THE BAN HAMMER 🔨'}
+                </button>
+              </div>
+            </div>
+
+            {/* Banned Users List */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <UserX size={16} /> Banned Users ({bannedUsers.length})
+                </h3>
+                <button
+                  onClick={async () => {
+                    setAdminLoading(true);
+                    const data = await fetchBannedUsers();
+                    setBannedUsers(data);
+                    setAdminLoading(false);
+                  }}
+                  style={{ padding: '0.45rem 0.85rem', borderRadius: '0.5rem', border: '1px solid var(--border-color)', backgroundColor: 'transparent', color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
+                >
+                  Refresh
+                </button>
+              </div>
+
+              {adminLoading ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}><Loader2 className="animate-spin" size={24} /></div>
+              ) : bannedUsers.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>
+                  No banned users yet. The peace is maintained. ✌️
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                  {bannedUsers.map(bu => (
+                    <div key={bu.id} style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '0.85rem 1.15rem',
+                      borderRadius: '0.85rem',
+                      backgroundColor: 'rgba(239, 68, 68, 0.04)',
+                      border: '1px solid rgba(239, 68, 68, 0.12)',
+                    }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                        <span style={{ fontWeight: 900, fontSize: '0.9rem', color: '#fca5a5' }}>{bu.username}</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                          {bu.reason} • {bu.expires_at ? `Expires ${new Date(bu.expires_at).toLocaleDateString()}` : 'Permanent'}
+                        </span>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          const result = await unbanUser(bu.user_id);
+                          if (result.success) {
+                            setBannedUsers(prev => prev.filter(b => b.id !== bu.id));
+                            setAdminMessage({ type: 'success', text: `${bu.username} has been unbanned.` });
+                          }
+                        }}
+                        style={{
+                          padding: '0.45rem 0.85rem',
+                          borderRadius: '0.5rem',
+                          border: '1px solid rgba(34,197,94,0.3)',
+                          backgroundColor: 'rgba(34,197,94,0.08)',
+                          color: '#86efac',
+                          fontSize: '0.75rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <UserCheckIcon size={13} /> Unban
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
     </main>
   );

@@ -592,3 +592,14 @@ button {
     transform: translateY(0) scale(1);
   }
 }
+
+/* Ban overlay animations */
+@keyframes banPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.15); opacity: 0.7; }
+}
+
+@keyframes scanlines {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 100vh; }
+}

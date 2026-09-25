@@ -1,10 +1,11 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Search, ChevronDown, BookmarkPlus, BookmarkCheck, Server, SkipForward, ChevronRight, ChevronLeft, ToggleLeft, ToggleRight, Check, Users, AlertTriangle, Tag, Star, Tv, Film, Calendar } from 'lucide-react';
+import { ArrowLeft, Search, ChevronDown, BookmarkPlus, BookmarkCheck, Server, SkipForward, ChevronRight, ChevronLeft, ToggleLeft, ToggleRight, Check, Users, AlertTriangle, Tag, Star, Tv, Film, Calendar, Ban, Skull } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { animeServers, getServerUrl, fetchAniListMetadata, getAnimeDetails, type AnimeServer } from '../lib/animeServers';
 import { CommentSection } from '../components/CommentSection';
+import { checkBanStatus, getRandomTrollMessage } from '../lib/adminUtils';
 
 export function Watch() {
   const { id } = useParams<{ id: string }>();
@@ -40,12 +41,26 @@ export function Watch() {
   const [selectedServer, setSelectedServer] = useState<AnimeServer>(animeServers[0]); // AnimePlay is primary
   const [showServerDropdown, setShowServerDropdown] = useState(false);
   const [autoNext, setAutoNext] = useState(true);
+  const [isBanned, setIsBanned] = useState(false);
+  const [banReason, setBanReason] = useState('');
+  const [trollMessage, setTrollMessage] = useState('');
   
   const CHUNK_SIZE = 200;
 
   useEffect(() => {
     if (id) {
       const cacheBuster = Date.now();
+
+      // 0. Check if user is banned FIRST
+      if (user) {
+        checkBanStatus(user.id).then(result => {
+          if (result.banned) {
+            setIsBanned(true);
+            setBanReason(result.reason);
+            setTrollMessage(getRandomTrollMessage());
+          }
+        });
+      }
       
       // 1. Fetch AniList Metadata FIRST — it's the primary source for title, image, anilistId, and episodes
       //    AniList is more reliable and doesn't rate-limit as aggressively as Jikan
@@ -412,7 +427,98 @@ export function Watch() {
               </div>
             </div>
 
-            {/* Player Container */}
+            {/* Player Container — Ban Check */}
+            {isBanned ? (
+              <div style={{
+                flex: '1 1 auto',
+                width: '100%',
+                aspectRatio: '16/9',
+                borderRadius: '1rem',
+                overflow: 'hidden',
+                border: '2px solid #ef4444',
+                boxShadow: '0 0 60px rgba(239, 68, 68, 0.3), 0 0 120px rgba(239, 68, 68, 0.1)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'linear-gradient(180deg, #0a0000 0%, #1a0505 40%, #0a0000 100%)',
+                position: 'relative',
+                textAlign: 'center',
+                padding: '2rem',
+                gap: '1.25rem'
+              }}>
+                {/* Animated scan lines */}
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,0,0,0.03) 2px, rgba(255,0,0,0.03) 4px)',
+                  animation: 'scanlines 8s linear infinite',
+                  pointerEvents: 'none',
+                  zIndex: 1
+                }} />
+
+                {/* Pulsing skull */}
+                <div style={{
+                  width: '80px',
+                  height: '80px',
+                  borderRadius: '50%',
+                  background: 'radial-gradient(circle, rgba(239,68,68,0.15) 0%, transparent 70%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  animation: 'banPulse 2s ease-in-out infinite',
+                  position: 'relative',
+                  zIndex: 2
+                }}>
+                  <Skull size={48} color="#ef4444" style={{ filter: 'drop-shadow(0 0 15px rgba(239,68,68,0.6))' }} />
+                </div>
+
+                <div style={{ position: 'relative', zIndex: 2 }}>
+                  <h2 style={{
+                    fontSize: '1.8rem',
+                    fontWeight: 900,
+                    color: '#ef4444',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.1em',
+                    textShadow: '0 0 20px rgba(239,68,68,0.5), 0 0 40px rgba(239,68,68,0.2)',
+                    marginBottom: '0.5rem'
+                  }}>
+                    ACCESS DENIED
+                  </h2>
+                  <p style={{
+                    fontSize: '1rem',
+                    color: '#fca5a5',
+                    fontWeight: 700,
+                    maxWidth: '400px',
+                    lineHeight: 1.6
+                  }}>
+                    {trollMessage}
+                  </p>
+                </div>
+
+                <div style={{
+                  backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                  borderRadius: '0.75rem',
+                  padding: '0.75rem 1.5rem',
+                  fontSize: '0.82rem',
+                  color: 'rgba(255,255,255,0.5)',
+                  fontWeight: 600,
+                  position: 'relative',
+                  zIndex: 2,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <Ban size={14} color="#ef4444" />
+                  Reason: {banReason}
+                </div>
+
+                <p style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.2)', fontWeight: 600, position: 'relative', zIndex: 2 }}>
+                  Contact the admin if you think this is a mistake.
+                </p>
+              </div>
+            ) : (
             <div style={{ flex: '1 1 auto', width: '100%', aspectRatio: '16/9', backgroundColor: 'var(--bg-color-secondary)', borderRadius: '1rem', overflow: 'hidden', border: '1px solid var(--border-color)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
               <iframe 
                 src={getServerUrl(selectedServer, id || '', selectedEpisode, type, anilistId || id)}
@@ -425,6 +531,7 @@ export function Watch() {
                 key={`${selectedServer.id}-${selectedEpisode}-${type}-${anilistId}`}
               />
             </div>
+            )}
             
             {/* Controls */}
             <div style={{ flex: '1 1 300px' }}>

@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Search, ChevronDown, BookmarkPlus, BookmarkCheck, Server, SkipForward, ChevronRight, ChevronLeft, ToggleLeft, ToggleRight, Check, Users, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Search, ChevronDown, BookmarkPlus, BookmarkCheck, Server, SkipForward, ChevronRight, ChevronLeft, ToggleLeft, ToggleRight, Check, Users, AlertTriangle, Tag, Star, Tv, Film, Calendar } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { animeServers, getServerUrl, fetchAniListMetadata, getAnimeDetails, type AnimeServer } from '../lib/animeServers';
@@ -18,6 +18,14 @@ export function Watch() {
   const [type, setType] = useState<'sub' | 'dub'>('sub');
   const [anilistId, setAnilistId] = useState<string>('');
   const [relations, setRelations] = useState<any[]>([]);
+  const [animeGenres, setAnimeGenres] = useState<string[]>([]);
+  const [animeDescription, setAnimeDescription] = useState<string | null>(null);
+  const [animeFormat, setAnimeFormat] = useState<string | null>(null);
+  const [animeSeason, setAnimeSeason] = useState<string | null>(null);
+  const [animeSeasonYear, setAnimeSeasonYear] = useState<number | null>(null);
+  const [animeScore, setAnimeScore] = useState<number | null>(null);
+  const [animeStudios, setAnimeStudios] = useState<string[]>([]);
+  const [showFullDescription, setShowFullDescription] = useState(false);
   
   const [inWatchlist, setInWatchlist] = useState(false);
   const [watchlistLoading, setWatchlistLoading] = useState(false);
@@ -54,6 +62,14 @@ export function Watch() {
           if (metadata.coverImage) {
             setAnimeImage(prev => prev === '' ? metadata.coverImage! : prev);
           }
+          // Set genres, description, and extra metadata
+          if (metadata.genres?.length) setAnimeGenres(metadata.genres);
+          if (metadata.description) setAnimeDescription(metadata.description);
+          if (metadata.format) setAnimeFormat(metadata.format);
+          if (metadata.season) setAnimeSeason(metadata.season);
+          if (metadata.seasonYear) setAnimeSeasonYear(metadata.seasonYear);
+          if (metadata.averageScore) setAnimeScore(metadata.averageScore);
+          if (metadata.studios?.length) setAnimeStudios(metadata.studios);
         })
         .catch(console.error);
 
@@ -412,7 +428,145 @@ export function Watch() {
             
             {/* Controls */}
             <div style={{ flex: '1 1 300px' }}>
-              <h1 style={{ fontSize: '2rem', fontWeight: 900, marginBottom: '1rem', lineHeight: 1.2 }}>{animeName}</h1>
+              <h1 style={{ fontSize: '2rem', fontWeight: 900, marginBottom: '0.5rem', lineHeight: 1.2 }}>{animeName}</h1>
+
+              {/* Anime Info Bar — Score, Format, Season, Studio */}
+              {(animeScore || animeFormat || animeSeason || animeStudios.length > 0) && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  flexWrap: 'wrap',
+                  marginBottom: '0.75rem',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  color: 'var(--text-secondary)'
+                }}>
+                  {animeScore && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', color: '#facc15' }}>
+                      <Star size={14} fill="#facc15" stroke="#facc15" />
+                      {(animeScore / 10).toFixed(1)}
+                    </span>
+                  )}
+                  {animeFormat && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                      {animeFormat === 'MOVIE' ? <Film size={13} /> : <Tv size={13} />}
+                      {animeFormat === 'TV' ? 'TV Series' : animeFormat === 'TV_SHORT' ? 'TV Short' : animeFormat === 'MOVIE' ? 'Movie' : animeFormat === 'OVA' ? 'OVA' : animeFormat === 'ONA' ? 'ONA' : animeFormat === 'SPECIAL' ? 'Special' : animeFormat}
+                    </span>
+                  )}
+                  {animeSeason && animeSeasonYear && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <Calendar size={13} />
+                      {animeSeason.charAt(0) + animeSeason.slice(1).toLowerCase()} {animeSeasonYear}
+                    </span>
+                  )}
+                  {animeStudios.length > 0 && (
+                    <span style={{ color: 'var(--accent-primary)' }}>
+                      {animeStudios.join(', ')}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Genre Tags */}
+              {animeGenres.length > 0 && (
+                <div style={{
+                  display: 'flex',
+                  gap: '0.45rem',
+                  flexWrap: 'wrap',
+                  marginBottom: '1rem'
+                }}>
+                  {animeGenres.map((genre, i) => (
+                    <Link
+                      key={genre}
+                      to={`/browse?genre=${genre}`}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        padding: '0.35rem 0.85rem',
+                        borderRadius: '9999px',
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.04em',
+                        textDecoration: 'none',
+                        backgroundColor: 'rgba(245, 158, 11, 0.08)',
+                        border: '1px solid rgba(245, 158, 11, 0.18)',
+                        color: 'var(--accent-primary)',
+                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                        animation: `fadeSlideUp 0.4s ease-out ${i * 0.04}s both`,
+                        cursor: 'pointer',
+                      }}
+                      onMouseOver={e => {
+                        (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--accent-primary)';
+                        (e.currentTarget as HTMLElement).style.color = 'black';
+                        (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent-primary)';
+                        (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px) scale(1.05)';
+                        (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 15px rgba(245, 158, 11, 0.3)';
+                      }}
+                      onMouseOut={e => {
+                        (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(245, 158, 11, 0.08)';
+                        (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)';
+                        (e.currentTarget as HTMLElement).style.borderColor = 'rgba(245, 158, 11, 0.18)';
+                        (e.currentTarget as HTMLElement).style.transform = 'translateY(0) scale(1)';
+                        (e.currentTarget as HTMLElement).style.boxShadow = 'none';
+                      }}
+                    >
+                      <Tag size={11} />
+                      {genre}
+                    </Link>
+                  ))}
+                </div>
+              )}
+
+              {/* Synopsis / Description */}
+              {animeDescription && (
+                <div style={{
+                  marginBottom: '1.5rem',
+                  padding: '1rem 1.25rem',
+                  borderRadius: '0.85rem',
+                  backgroundColor: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                  position: 'relative',
+                  overflow: 'hidden',
+                }}>
+                  <p style={{
+                    fontSize: '0.85rem',
+                    lineHeight: 1.75,
+                    color: 'var(--text-secondary)',
+                    fontWeight: 500,
+                    margin: 0,
+                    maxHeight: showFullDescription ? 'none' : '4.5em',
+                    overflow: 'hidden',
+                    transition: 'max-height 0.4s ease',
+                  }}>
+                    {animeDescription}
+                  </p>
+                  {animeDescription.length > 200 && (
+                    <button
+                      onClick={() => setShowFullDescription(!showFullDescription)}
+                      style={{
+                        background: showFullDescription ? 'none' : 'linear-gradient(transparent, rgba(3,3,3,0.95) 60%)',
+                        border: 'none',
+                        color: 'var(--accent-primary)',
+                        fontSize: '0.78rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        padding: showFullDescription ? '0.5rem 0 0 0' : '2.5rem 0 0 0',
+                        width: '100%',
+                        textAlign: 'left',
+                        position: showFullDescription ? 'relative' : 'absolute',
+                        bottom: showFullDescription ? undefined : 0,
+                        left: showFullDescription ? undefined : 0,
+                        transition: 'all 0.2s ease',
+                      }}
+                    >
+                      {showFullDescription ? '▲ Show Less' : '▼ Read More'}
+                    </button>
+                  )}
+                </div>
+              )}
 
               {/* Seasons & Related Anime */}
               {relations.length > 0 && (

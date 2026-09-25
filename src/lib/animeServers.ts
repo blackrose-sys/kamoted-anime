@@ -48,13 +48,20 @@ export interface AniListMetadata {
   status: string | null;
   title: string | null;
   coverImage: string | null;
+  genres: string[];
+  description: string | null;
+  format: string | null;
+  season: string | null;
+  seasonYear: number | null;
+  averageScore: number | null;
+  studios: string[];
 }
 
 /**
  * Fetch metadata and real-time episode counts from AniList.
  */
 export async function fetchAniListMetadata(malId: string): Promise<AniListMetadata> {
-  const cacheKey = `anilist_metadata_${malId}`;
+  const cacheKey = `anilist_metadata_v2_${malId}`;
   
   // Check cache first - make sure title & coverImage are present in cached object
   try {
@@ -74,6 +81,12 @@ export async function fetchAniListMetadata(malId: string): Promise<AniListMetada
           id
           status
           episodes
+          format
+          season
+          seasonYear
+          averageScore
+          description(asHtml: false)
+          genres
           nextAiringEpisode {
             episode
           }
@@ -85,6 +98,11 @@ export async function fetchAniListMetadata(malId: string): Promise<AniListMetada
           coverImage {
             large
             extraLarge
+          }
+          studios(isMain: true) {
+            nodes {
+              name
+            }
           }
         }
       }
@@ -110,12 +128,25 @@ export async function fetchAniListMetadata(malId: string): Promise<AniListMetada
     const title = media?.title?.english || media?.title?.romaji || media?.title?.userPreferred || null;
     const coverImage = media?.coverImage?.extraLarge || media?.coverImage?.large || null;
     
-    const metadata = {
+    // Extract description, strip markdown-like formatting
+    let description = media?.description || null;
+    if (description) {
+      description = description.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').trim();
+    }
+
+    const metadata: AniListMetadata = {
       anilistId,
       episodes,
       status: media?.status || null,
       title,
-      coverImage
+      coverImage,
+      genres: media?.genres || [],
+      description,
+      format: media?.format || null,
+      season: media?.season || null,
+      seasonYear: media?.seasonYear || null,
+      averageScore: media?.averageScore || null,
+      studios: (media?.studios?.nodes || []).map((s: any) => s.name),
     };
     
     // Cache the result if title exists
@@ -126,7 +157,7 @@ export async function fetchAniListMetadata(malId: string): Promise<AniListMetada
     return metadata;
   } catch (error) {
     console.error('Failed to fetch AniList metadata:', error);
-    return { anilistId: null, episodes: null, status: null, title: null, coverImage: null };
+    return { anilistId: null, episodes: null, status: null, title: null, coverImage: null, genres: [], description: null, format: null, season: null, seasonYear: null, averageScore: null, studios: [] };
   }
 }
 

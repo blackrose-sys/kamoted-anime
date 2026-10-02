@@ -124,6 +124,79 @@ export function ChatSidebar() {
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const lastNotifTimeRef = useRef(0);
+
+  // --- Notification Sound System ---
+  const audioContextRef = useRef<AudioContext | null>(null);
+
+  const getAudioContext = useCallback(() => {
+    if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    if (audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume();
+    }
+    return audioContextRef.current;
+  }, []);
+
+  const playNotificationSound = useCallback((type: 'mention' | 'message' = 'message') => {
+    // Throttle: max 1 sound per 2 seconds
+    const now = Date.now();
+    if (now - lastNotifTimeRef.current < 2000) return;
+    lastNotifTimeRef.current = now;
+
+    try {
+      const ctx = getAudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      if (type === 'mention') {
+        // Mention: double-chime (higher pitch, more urgent)
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        osc.frequency.setValueAtTime(1100, ctx.currentTime + 0.1);
+        osc.frequency.setValueAtTime(1320, ctx.currentTime + 0.2);
+        gain.gain.setValueAtTime(0.15, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.4);
+      } else {
+        // Regular message: soft pop
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(660, ctx.currentTime);
+        osc.frequency.setValueAtTime(880, ctx.currentTime + 0.08);
+        gain.gain.setValueAtTime(0.08, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.2);
+      }
+    } catch { /* AudioContext not available */ }
+  }, [getAudioContext]);
+
+  const showBrowserNotification = useCallback((title: string, body: string) => {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'granted') {
+      new Notification(title, {
+        body,
+        icon: '/favicon.ico',
+        tag: 'kamoted-chat',
+        silent: true, // We play our own sound
+      });
+    } else if (Notification.permission !== 'denied') {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  // Request notification permission on mount
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      // Delay to avoid annoying users on first page load
+      const t = setTimeout(() => Notification.requestPermission(), 10000);
+      return () => clearTimeout(t);
+    }
+  }, []);
 
   const MAX_CHARS = 500;
 
@@ -357,7 +430,36 @@ export function ChatSidebar() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, (p) => {
         const msg = p.new as ChatMessage;
         setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
-        if (!isOpenRef.current) setHasNew(true);
+        
+        // Don't notify for own messages
+        if (msg.user_id !== user?.id) {
+          const isMentioned = user?.username && msg.message.toLowerCase().includes(`@${user.username.toLowerCase()}`);
+          const isTabHidden = document.hidden;
+          const chatClosed = !isOpenRef.current;
+          
+          if (isMentioned) {
+            // Always play mention sound (even if chat is open)
+            playNotificationSound('mention');
+            if (isTabHidden) {
+              showBrowserNotification(
+                `💬 ${msg.username} mentioned you!`,
+                msg.message.length > 100 ? msg.message.substring(0, 100) + '...' : msg.message
+              );
+              // Flash the tab title
+              const originalTitle = document.title;
+              document.title = `💬 ${msg.username} mentioned you! — Kamoted`;
+              const restore = () => { document.title = originalTitle; document.removeEventListener('visibilitychange', restore); };
+              document.addEventListener('visibilitychange', restore);
+            }
+          } else if (chatClosed || isTabHidden) {
+            playNotificationSound('message');
+            if (isTabHidden) {
+              showBrowserNotification('Kamoted Chat', `${msg.username}: ${msg.message.substring(0, 80)}`);
+            }
+          }
+          
+          if (chatClosed) setHasNew(true);
+        }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chat_messages' }, (p) => {
         const updated = p.new as ChatMessage;
@@ -469,10 +571,24 @@ export function ChatSidebar() {
   };
 
   /* ─── Send ─── */
+  const sendTimestampsRef = useRef<number[]>([]);
+  
   const handleSend = async () => {
     if (!user) { navigate('/login'); return; }
-    const text = input.trim();
-    if ((!text && !mediaFile) || text.length > MAX_CHARS || sending) return;
+    const rawText = input.trim();
+    if ((!rawText && !mediaFile) || rawText.length > MAX_CHARS || sending) return;
+    
+    // Rate limit: max 5 messages per 10 seconds
+    const now = Date.now();
+    sendTimestampsRef.current = sendTimestampsRef.current.filter(t => now - t < 10000);
+    if (sendTimestampsRef.current.length >= 5) {
+      alert('Slow down! You\'re sending messages too fast.');
+      return;
+    }
+    sendTimestampsRef.current.push(now);
+    
+    // Sanitize: strip HTML tags and script injections
+    const text = rawText.replace(/<[^>]*>/g, '').replace(/javascript:/gi, '').replace(/on\w+=/gi, '');
     
     setSending(true);
     setInput('');

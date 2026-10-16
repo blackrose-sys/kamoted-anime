@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Loader2, Mail, Lock, User, Eye, EyeOff, CheckCircle2, XCircle, ShieldCheck } from 'lucide-react';
+import { Loader2, Mail, Lock, User, Eye, EyeOff, CheckCircle2, XCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import {
   checkActionRateLimit,
@@ -13,7 +13,8 @@ import {
   sanitizeInput,
   ddosBurstShield
 } from '../lib/security';
-import { SecurityBadge, HoneypotTrap } from '../components/SecurityBadge';
+import { HoneypotTrap } from '../components/SecurityBadge';
+import { RobotVerification } from '../components/RobotVerification';
 
 export function Register() {
   const [username, setUsername] = useState('');
@@ -26,6 +27,8 @@ export function Register() {
   const [securityStatus, setSecurityStatus] = useState('');
   const [honeypot, setHoneypot] = useState('');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [isRobotVerified, setIsRobotVerified] = useState(false);
+  const [robotError, setRobotError] = useState(false);
   
   const mountTimeRef = useRef<number>(Date.now());
   const navigate = useNavigate();
@@ -44,7 +47,14 @@ export function Register() {
 
     // 1. DDoS burst shield check
     if (!ddosBurstShield.canMakeRequest()) {
-      setError('Too many requests detected. Kamoted DDoS protection throttled this action. Please pause for 5 seconds.');
+      setError('Too many requests detected. Please pause for 5 seconds.');
+      return;
+    }
+
+    // 2. "I'm not a robot" check
+    if (!isRobotVerified) {
+      setRobotError(true);
+      setError('Please check "I\'m not a robot" to verify.');
       return;
     }
 
@@ -204,10 +214,7 @@ export function Register() {
     <main className="container fade-in" style={{ flex: 1, padding: '7rem 1.5rem', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
       <div className="glass" style={{ width: '100%', maxWidth: '450px', padding: '2.5rem', borderRadius: '1.25rem', border: '1px solid var(--border-color)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
         
-        {/* Security Badge */}
-        <div style={{ marginBottom: '1.25rem' }}>
-          <SecurityBadge />
-        </div>
+
 
         <h1 style={{ fontSize: '2rem', fontWeight: 900, marginBottom: '0.25rem', textAlign: 'center' }}>Create Account</h1>
         <p style={{ color: 'var(--text-secondary)', textAlign: 'center', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
@@ -351,6 +358,19 @@ export function Register() {
             </label>
           </div>
           
+          {/* "I'm not a robot" Verification Widget */}
+          <div style={{ marginTop: '0.25rem' }}>
+            <RobotVerification
+              verified={isRobotVerified}
+              onVerify={(v) => {
+                setIsRobotVerified(v);
+                setRobotError(false);
+                if (error.includes('not a robot')) setError('');
+              }}
+              hasError={robotError}
+            />
+          </div>
+
           <button 
             type="submit" 
             className="btn-primary" 
@@ -378,12 +398,6 @@ export function Register() {
         
         <div style={{ marginTop: '2rem', textAlign: 'center', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
           Already have an account? <Link to="/login" style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>Login</Link>
-        </div>
-
-        {/* Security Footer */}
-        <div style={{ marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', color: 'rgba(255,255,255,0.4)', fontSize: '0.72rem' }}>
-          <ShieldCheck size={13} color="#10b981" />
-          <span>Protected by Kamoted Shield • Anti-Bot & DDoS Guard</span>
         </div>
       </div>
     </main>

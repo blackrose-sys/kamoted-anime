@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, Mail, ArrowLeft, CheckCircle2, XCircle, ShieldCheck } from 'lucide-react';
+import { Loader2, Mail, ArrowLeft, CheckCircle2, XCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import {
   checkActionRateLimit,
@@ -13,7 +13,8 @@ import {
   sanitizeInput,
   ddosBurstShield
 } from '../lib/security';
-import { SecurityBadge, HoneypotTrap } from '../components/SecurityBadge';
+import { HoneypotTrap } from '../components/SecurityBadge';
+import { RobotVerification } from '../components/RobotVerification';
 
 export function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -23,6 +24,8 @@ export function ForgotPassword() {
   const [securityStatus, setSecurityStatus] = useState('');
   const [honeypot, setHoneypot] = useState('');
   const [cooldownSec, setCooldownSec] = useState(0);
+  const [isRobotVerified, setIsRobotVerified] = useState(false);
+  const [robotError, setRobotError] = useState(false);
 
   const mountTimeRef = useRef<number>(Date.now());
 
@@ -42,7 +45,7 @@ export function ForgotPassword() {
 
     // 1. DDoS Burst Shield
     if (!ddosBurstShield.canMakeRequest()) {
-      setError('Too many requests detected. Kamoted DDoS protection throttled this action. Please pause for 5 seconds.');
+      setError('Too many requests detected. Please pause for 5 seconds.');
       return;
     }
 
@@ -52,7 +55,7 @@ export function ForgotPassword() {
       setLoading(true);
       setTimeout(() => {
         setLoading(false);
-        setSuccess(true); // Fake success to fool scrapers without sending email
+        setSuccess(true);
       }, 1000);
       return;
     }
@@ -84,6 +87,13 @@ export function ForgotPassword() {
       return;
     }
 
+    // 6. "I'm not a robot" check
+    if (!isRobotVerified) {
+      setRobotError(true);
+      setError('Please check "I\'m not a robot" to verify.');
+      return;
+    }
+
     const cleanEmail = sanitizeInput(email).toLowerCase();
     if (!cleanEmail || !cleanEmail.includes('@')) {
       setError('Please enter a valid email address.');
@@ -93,8 +103,8 @@ export function ForgotPassword() {
     setLoading(true);
 
     try {
-      // 6. Computational Proof-of-Work Puzzle (Anti-Spam / Anti-DDoS)
-      setSecurityStatus('Verifying security token...');
+      // 7. Computational Proof-of-Work Puzzle (Anti-Spam / Anti-DDoS)
+      setSecurityStatus('Verifying...');
       const powChallenge = generatePoWChallenge(3);
       await solvePoWChallenge(powChallenge);
       setSecurityStatus('');
@@ -148,11 +158,6 @@ export function ForgotPassword() {
     <main className="container fade-in" style={{ flex: 1, padding: '7rem 1.5rem', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
       <div className="glass" style={{ width: '100%', maxWidth: '450px', padding: '2.5rem', borderRadius: '1.25rem', border: '1px solid var(--border-color)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
         
-        {/* Security Badge */}
-        <div style={{ marginBottom: '1.25rem' }}>
-          <SecurityBadge />
-        </div>
-
         <h1 style={{ fontSize: '2rem', fontWeight: 900, marginBottom: '0.25rem', textAlign: 'center' }}>Reset Password</h1>
         <p style={{ color: 'var(--text-secondary)', textAlign: 'center', marginBottom: '1.75rem', fontSize: '0.875rem' }}>
           Enter your email and we'll send you a link to reset your password.
@@ -210,6 +215,19 @@ export function ForgotPassword() {
               </div>
             </div>
 
+            {/* "I'm not a robot" Verification Widget */}
+            <div style={{ marginTop: '0.25rem' }}>
+              <RobotVerification
+                verified={isRobotVerified}
+                onVerify={(v) => {
+                  setIsRobotVerified(v);
+                  setRobotError(false);
+                  if (error.includes('not a robot')) setError('');
+                }}
+                hasError={robotError}
+              />
+            </div>
+
             <button 
               type="submit" 
               className="btn-primary" 
@@ -243,12 +261,6 @@ export function ForgotPassword() {
             </div>
           </form>
         )}
-
-        {/* Security Footer */}
-        <div style={{ marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', color: 'rgba(255,255,255,0.4)', fontSize: '0.72rem' }}>
-          <ShieldCheck size={13} color="#10b981" />
-          <span>Protected by Kamoted Shield • Anti-Bot & DDoS Guard</span>
-        </div>
       </div>
     </main>
   );

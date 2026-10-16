@@ -8,7 +8,7 @@ import {
   generatePoWChallenge,
   solvePoWChallenge
 } from '../lib/security';
-import { SecurityBadge, HoneypotTrap } from '../components/SecurityBadge';
+import { HoneypotTrap } from '../components/SecurityBadge';
 
 export function ResetPassword() {
   const [password, setPassword] = useState('');
@@ -164,10 +164,7 @@ export function ResetPassword() {
           Please choose a new secure password.
         </p>
 
-        {/* Security Badge */}
-        <div style={{ marginBottom: '1.25rem' }}>
-          <SecurityBadge />
-        </div>
+
 
         {error ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', alignItems: 'center', textAlign: 'center' }}>

@@ -11,7 +11,8 @@ import {
   sanitizeInput,
   ddosBurstShield
 } from '../lib/security';
-import { SecurityBadge, HoneypotTrap } from '../components/SecurityBadge';
+import { HoneypotTrap } from '../components/SecurityBadge';
+import { RobotVerification } from '../components/RobotVerification';
 
 interface ContactMsg {
   id: string;
@@ -36,6 +37,8 @@ export function Contact() {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
   const [honeypot, setHoneypot] = useState('');
+  const [isRobotVerified, setIsRobotVerified] = useState(false);
+  const [robotError, setRobotError] = useState(false);
   const mountTimeRef = useRef<number>(Date.now());
 
   // Dev inbox (only for fckitscott)
@@ -132,6 +135,13 @@ export function Contact() {
     });
     if (!rateCheck.allowed) {
       setError(`Contact limit reached. Please wait ${rateCheck.waitSeconds}s before sending another message.`);
+      return;
+    }
+
+    // 6. "I'm not a robot" check
+    if (!isRobotVerified) {
+      setRobotError(true);
+      setError('Please check "I\'m not a robot" to verify.');
       return;
     }
 
@@ -361,10 +371,7 @@ export function Contact() {
           </p>
         </div>
 
-        {/* Security Badge */}
-        <div style={{ marginBottom: '1.25rem' }}>
-          <SecurityBadge />
-        </div>
+
 
         {/* Error */}
         {error && (
@@ -447,6 +454,19 @@ export function Contact() {
           }}>
             <span>{message.length > 0 ? `${message.length} characters` : ''}</span>
             <span>* Required fields</span>
+          </div>
+
+          {/* "I'm not a robot" Verification Widget */}
+          <div style={{ marginTop: '0.25rem' }}>
+            <RobotVerification
+              verified={isRobotVerified}
+              onVerify={(v) => {
+                setIsRobotVerified(v);
+                setRobotError(false);
+                if (error.includes('not a robot')) setError('');
+              }}
+              hasError={robotError}
+            />
           </div>
 
           {/* Submit */}

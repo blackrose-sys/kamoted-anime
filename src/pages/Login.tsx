@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Loader2, Mail, Lock, Eye, EyeOff, XCircle, ShieldCheck } from 'lucide-react';
+import { Loader2, Mail, Lock, Eye, EyeOff, XCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import {
   checkLoginSecurity,
@@ -14,7 +14,8 @@ import {
   sanitizeInput,
   ddosBurstShield
 } from '../lib/security';
-import { SecurityBadge, HoneypotTrap } from '../components/SecurityBadge';
+import { HoneypotTrap } from '../components/SecurityBadge';
+import { RobotVerification } from '../components/RobotVerification';
 
 export function Login() {
   const [email, setEmail] = useState('');
@@ -25,11 +26,12 @@ export function Login() {
   const [securityStatus, setSecurityStatus] = useState<string>('');
   const [honeypot, setHoneypot] = useState('');
   
+  // Anti-bot "I'm not a robot" state
+  const [isRobotVerified, setIsRobotVerified] = useState(false);
+  const [robotError, setRobotError] = useState(false);
+
   // Security attempt tracking & lockout states
-  const [remainingAttempts, setRemainingAttempts] = useState<number>(5);
   const [lockoutSeconds, setLockoutSeconds] = useState<number>(0);
-  const [requireHumanCheck, setRequireHumanCheck] = useState(false);
-  const [isHumanVerified, setIsHumanVerified] = useState(true);
 
   const mountTimeRef = useRef<number>(Date.now());
   const navigate = useNavigate();
@@ -38,17 +40,12 @@ export function Login() {
   useEffect(() => {
     if (!email.trim()) {
       setLockoutSeconds(0);
-      setRemainingAttempts(5);
       return;
     }
     const sec = checkLoginSecurity(email);
-    setRemainingAttempts(sec.remainingAttempts);
     setLockoutSeconds(sec.lockoutSeconds);
     if (sec.isLocked) {
       setError(sec.message || 'Account temporarily locked due to failed attempts.');
-    } else if (sec.remainingAttempts <= 2) {
-      setRequireHumanCheck(true);
-      setIsHumanVerified(false);
     }
   }, [email]);
 
@@ -58,14 +55,13 @@ export function Login() {
 
     // 1. Check Global DDoS burst shield
     if (!ddosBurstShield.canMakeRequest()) {
-      setError('Too many requests detected. Kamoted DDoS protection throttled this action. Please pause for 5 seconds.');
+      setError('Too many requests detected. Please pause for 5 seconds.');
       return;
     }
 
     // 2. Anti-Bot Honeypot Trap
     if (isHoneypotTriggered(honeypot)) {
       console.warn('[Security] Bot honeypot triggered on login form.');
-      // Silently pretend to process for 1 second then error to fool the bot without touching database
       setLoading(true);
       setTimeout(() => {
         setLoading(false);
@@ -84,7 +80,7 @@ export function Login() {
 
     // 4. Form Submission Velocity Check (human reaction timer)
     if (isSubmissionTooFast(mountTimeRef.current, 600)) {
-      console.warn('[Security] Instantaneous form submission blocked (bot trap).');
+      console.warn('[Security] Instantaneous form submission blocked.');
       setError('Form submitted too fast. Please retry as a human user.');
       return;
     }
@@ -98,9 +94,10 @@ export function Login() {
       return;
     }
 
-    // 6. Interactive verification if suspicious
-    if (requireHumanCheck && !isHumanVerified) {
-      setError('Please complete the security human verification check below.');
+    // 6. "I'm not a robot" Verification check
+    if (!isRobotVerified) {
+      setRobotError(true);
+      setError('Please check "I\'m not a robot" to verify.');
       return;
     }
 
@@ -108,7 +105,7 @@ export function Login() {
 
     try {
       // 7. Solve Proof-of-Work Challenge (Computational puzzle to stop DDoS & brute-force script storms)
-      setSecurityStatus('Verifying secure connection...');
+      setSecurityStatus('Verifying...');
       const powChallenge = generatePoWChallenge(3);
       await solvePoWChallenge(powChallenge);
       setSecurityStatus('');
@@ -122,17 +119,13 @@ export function Login() {
       if (signInError) {
         // Record failure and update lockout status
         const failRecord = recordLoginFailure(cleanEmail);
-        setRemainingAttempts(failRecord.remainingAttempts);
         setLockoutSeconds(failRecord.lockoutSeconds);
 
         if (failRecord.isLocked) {
           setError(failRecord.message);
+          setIsRobotVerified(false);
         } else if (signInError.message.includes('Invalid login')) {
           setError(failRecord.message);
-          if (failRecord.remainingAttempts <= 2) {
-            setRequireHumanCheck(true);
-            setIsHumanVerified(false);
-          }
         } else if (signInError.message.includes('Email not confirmed')) {
           setError('Please verify your email first. Check your inbox for the verification code.');
           setTimeout(() => navigate('/verify', { state: { email: cleanEmail } }), 2000);
@@ -179,22 +172,6 @@ export function Login() {
     <main className="container fade-in" style={{ flex: 1, padding: '7rem 1.5rem', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
       <div className="glass" style={{ width: '100%', maxWidth: '450px', padding: '2.5rem', borderRadius: '1.25rem', border: '1px solid var(--border-color)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
         
-        {/* Security Badge Indicator */}
-        <div style={{ marginBottom: '1.5rem' }}>
-          <SecurityBadge
-            remainingAttempts={remainingAttempts}
-            lockoutSeconds={lockoutSeconds}
-            onLockoutEnd={() => {
-              setLockoutSeconds(0);
-              setError('');
-              const updated = checkLoginSecurity(email);
-              setRemainingAttempts(updated.remainingAttempts);
-            }}
-            showHumanVerification={requireHumanCheck}
-            onVerified={setIsHumanVerified}
-          />
-        </div>
-
         <h1 style={{ fontSize: '2rem', fontWeight: 900, marginBottom: '0.25rem', textAlign: 'center' }}>Welcome Back</h1>
         <p style={{ color: 'var(--text-secondary)', textAlign: 'center', marginBottom: '1.75rem', fontSize: '0.875rem' }}>Login to access your watchlist and history.</p>
         
@@ -270,6 +247,26 @@ export function Login() {
               </button>
             </div>
           </div>
+
+          {/* "I'm not a robot" Verification Widget */}
+          <div style={{ marginTop: '0.25rem' }}>
+            <RobotVerification
+              verified={isRobotVerified}
+              onVerify={(v) => {
+                setIsRobotVerified(v);
+                setRobotError(false);
+                if (error.includes('not a robot')) setError('');
+              }}
+              lockoutSeconds={lockoutSeconds}
+              onLockoutEnd={() => {
+                setLockoutSeconds(0);
+                setError('');
+                const updated = checkLoginSecurity(email);
+                if (!updated.isLocked) setLockoutSeconds(0);
+              }}
+              hasError={robotError}
+            />
+          </div>
           
           <button 
             type="submit" 
@@ -300,12 +297,6 @@ export function Login() {
         
         <div style={{ marginTop: '1.75rem', textAlign: 'center', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
           Don't have an account? <Link to="/register" style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>Register</Link>
-        </div>
-
-        {/* Security Footer */}
-        <div style={{ marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', color: 'rgba(255,255,255,0.4)', fontSize: '0.72rem' }}>
-          <ShieldCheck size={13} color="#10b981" />
-          <span>Protected by Kamoted Shield • Cryptographic Anti-DDoS Verification</span>
         </div>
       </div>
     </main>

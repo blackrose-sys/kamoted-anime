@@ -494,3 +494,40 @@ CREATE POLICY "Anyone can insert notifications"
 ON public.notifications FOR INSERT 
 WITH CHECK (true);
 
+
+-- ===================================================
+-- 12. Security Audit Logs & Anti-Abuse Protection
+-- ===================================================
+CREATE TABLE IF NOT EXISTS public.security_audit_logs (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  event_type TEXT NOT NULL, -- 'login_failed', 'rate_limit_exceeded', 'bot_trapped', 'honeypot_triggered'
+  target_identifier TEXT, -- obfuscated email or username
+  details JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+
+-- Enable RLS
+ALTER TABLE public.security_audit_logs ENABLE ROW LEVEL SECURITY;
+
+-- Only dev (fckitscott) can view audit logs
+DROP POLICY IF EXISTS "Dev can view security audit logs" ON public.security_audit_logs;
+CREATE POLICY "Dev can view security audit logs" 
+ON public.security_audit_logs FOR SELECT 
+USING (
+  EXISTS (
+    SELECT 1 FROM public.profiles 
+    WHERE profiles.id = auth.uid() 
+      AND profiles.username = 'fckitscott'
+  )
+);
+
+-- Anyone (including anon clients) can log security alerts
+DROP POLICY IF EXISTS "Anyone can insert audit logs" ON public.security_audit_logs;
+CREATE POLICY "Anyone can insert audit logs" 
+ON public.security_audit_logs FOR INSERT 
+WITH CHECK (true);
+
+-- Index for fast security event investigation
+CREATE INDEX IF NOT EXISTS idx_security_logs_created ON public.security_audit_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_security_logs_type ON public.security_audit_logs(event_type);
+

@@ -1,7 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Mail, User, MessageSquare, Send, Loader2, CheckCircle, AlertCircle, Sparkles, AtSign, Inbox, Clock, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import {
+  checkActionRateLimit,
+  recordAction,
+  isKnownBotEnvironment,
+  isSubmissionTooFast,
+  isHoneypotTriggered,
+  sanitizeInput,
+  ddosBurstShield
+} from '../lib/security';
+import { SecurityBadge, HoneypotTrap } from '../components/SecurityBadge';
 
 interface ContactMsg {
   id: string;
@@ -25,6 +35,8 @@ export function Contact() {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
+  const [honeypot, setHoneypot] = useState('');
+  const mountTimeRef = useRef<number>(Date.now());
 
   // Dev inbox (only for fckitscott)
   const [showInbox, setShowInbox] = useState(false);
@@ -80,31 +92,80 @@ export function Contact() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim() || !username.trim() || !message.trim()) {
+    setError('');
+
+    // 1. DDoS burst shield
+    if (!ddosBurstShield.canMakeRequest()) {
+      setError('Too many requests detected. Kamoted DDoS protection throttled this action. Please pause for 5 seconds.');
+      return;
+    }
+
+    // 2. Anti-Bot Honeypot Trap
+    if (isHoneypotTriggered(honeypot)) {
+      console.warn('[Security] Bot honeypot triggered on contact form.');
+      setSending(true);
+      setTimeout(() => {
+        setSending(false);
+        setSent(true); // Fake success for bots
+      }, 1000);
+      return;
+    }
+
+    // 3. Known bot automation detection
+    const botCheck = isKnownBotEnvironment();
+    if (botCheck.isBot) {
+      setError('Automated browsers are prohibited from submitting messages.');
+      return;
+    }
+
+    // 4. Form Submission Velocity Check (< 1200ms is a bot)
+    if (isSubmissionTooFast(mountTimeRef.current, 1200)) {
+      setError('Submission too fast. Please take a moment to write your message.');
+      return;
+    }
+
+    // 5. Contact Rate Limiting: max 2 messages per 5 minutes
+    const rateCheck = checkActionRateLimit('contact_form', {
+      maxRequests: 2,
+      windowSeconds: 300,
+      cooldownSeconds: 120
+    });
+    if (!rateCheck.allowed) {
+      setError(`Contact limit reached. Please wait ${rateCheck.waitSeconds}s before sending another message.`);
+      return;
+    }
+
+    const cleanName = sanitizeInput(name);
+    const cleanEmail = sanitizeInput(email).toLowerCase();
+    const cleanUsername = sanitizeInput(username);
+    const cleanSubject = sanitizeInput(subject);
+    const cleanMessage = sanitizeInput(message);
+
+    if (!cleanName || !cleanEmail || !cleanUsername || !cleanMessage) {
       setError('Please fill out all required fields — name, email, username, and message.');
       return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
       setError('Please enter a valid email address.');
       return;
     }
 
     setSending(true);
-    setError('');
 
     try {
       const { error: insertError } = await supabase.from('contact_messages').insert({
-        sender_name: name.trim(),
-        sender_email: email.trim(),
-        sender_username: username.trim(),
-        subject: subject.trim() || `Message from ${username.trim()}`,
-        message: message.trim(),
+        sender_name: cleanName,
+        sender_email: cleanEmail,
+        sender_username: cleanUsername,
+        subject: cleanSubject || `Message from ${cleanUsername}`,
+        message: cleanMessage,
         user_id: user?.id || null,
       });
 
       if (insertError) {
         setError(insertError.message || 'Failed to send your message. Please try again.');
       } else {
+        recordAction('contact_form');
         setSent(true);
         setSubject('');
         setMessage('');
@@ -300,6 +361,11 @@ export function Contact() {
           </p>
         </div>
 
+        {/* Security Badge */}
+        <div style={{ marginBottom: '1.25rem' }}>
+          <SecurityBadge />
+        </div>
+
         {/* Error */}
         {error && (
           <div className="fade-in" style={{
@@ -315,6 +381,9 @@ export function Contact() {
 
         {/* Form */}
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem', position: 'relative' }}>
+          {/* Honeypot Trap */}
+          <HoneypotTrap value={honeypot} onChange={setHoneypot} name="kamoted_contact_trap" />
+
           {/* Name + Username row */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
             {/* Name */}

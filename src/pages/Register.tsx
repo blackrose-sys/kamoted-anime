@@ -1,7 +1,19 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Loader2, Mail, Lock, User, Eye, EyeOff, CheckCircle2, XCircle } from 'lucide-react';
+import { Loader2, Mail, Lock, User, Eye, EyeOff, CheckCircle2, XCircle, ShieldCheck } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import {
+  checkActionRateLimit,
+  recordAction,
+  isKnownBotEnvironment,
+  isSubmissionTooFast,
+  isHoneypotTriggered,
+  generatePoWChallenge,
+  solvePoWChallenge,
+  sanitizeInput,
+  ddosBurstShield
+} from '../lib/security';
+import { SecurityBadge, HoneypotTrap } from '../components/SecurityBadge';
 
 export function Register() {
   const [username, setUsername] = useState('');
@@ -11,7 +23,11 @@ export function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [securityStatus, setSecurityStatus] = useState('');
+  const [honeypot, setHoneypot] = useState('');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  
+  const mountTimeRef = useRef<number>(Date.now());
   const navigate = useNavigate();
 
   // Password strength checks
@@ -26,12 +42,58 @@ export function Register() {
     e.preventDefault();
     setError('');
 
-    if (username.length < 3) {
+    // 1. DDoS burst shield check
+    if (!ddosBurstShield.canMakeRequest()) {
+      setError('Too many requests detected. Kamoted DDoS protection throttled this action. Please pause for 5 seconds.');
+      return;
+    }
+
+    // 2. Anti-Bot Honeypot Trap
+    if (isHoneypotTriggered(honeypot)) {
+      console.warn('[Security] Bot honeypot triggered on registration form.');
+      setLoading(true);
+      setTimeout(() => {
+        setLoading(false);
+        setError('Verification failed. Automated registration rejected.');
+      }, 1200);
+      return;
+    }
+
+    // 3. Known bot automation detection
+    const botCheck = isKnownBotEnvironment();
+    if (botCheck.isBot) {
+      console.warn('[Security] Automated browser detected on registration:', botCheck.reason);
+      setError('Automated browsers are prohibited from creating accounts.');
+      return;
+    }
+
+    // 4. Form Submission Velocity Check (< 1200ms is impossible for a human to fill 4 fields)
+    if (isSubmissionTooFast(mountTimeRef.current, 1200)) {
+      console.warn('[Security] Instantaneous registration form submission blocked.');
+      setError('Submission too fast. Please take a moment to review your details.');
+      return;
+    }
+
+    // 5. Registration Flood Rate Limiting (max 3 accounts per 30 mins)
+    const rateCheck = checkActionRateLimit('register_flood', {
+      maxRequests: 3,
+      windowSeconds: 1800,
+      cooldownSeconds: 600
+    });
+    if (!rateCheck.allowed) {
+      setError(`Account creation limit reached. Please wait ${rateCheck.waitSeconds} seconds before registering another account.`);
+      return;
+    }
+
+    const cleanUsername = sanitizeInput(username);
+    const cleanEmail = sanitizeInput(email).toLowerCase();
+
+    if (cleanUsername.length < 3) {
       setError('Username must be at least 3 characters.');
       return;
     }
 
-    if (!email.includes('@') || !email.includes('.')) {
+    if (!cleanEmail.includes('@') || !cleanEmail.includes('.')) {
       setError('Please enter a valid email address.');
       return;
     }
@@ -49,11 +111,17 @@ export function Register() {
     setLoading(true);
 
     try {
+      // 6. Computational Proof-of-Work Puzzle (DDoS & Mass-Account Bot Protection)
+      setSecurityStatus('Computing anti-bot cryptographic check...');
+      const powChallenge = generatePoWChallenge(3);
+      await solvePoWChallenge(powChallenge);
+      setSecurityStatus('');
+
       // Check if email already exists in profiles
       const { data: existingEmail } = await supabase
         .from('profiles')
         .select('id')
-        .eq('email', email.trim().toLowerCase())
+        .eq('email', cleanEmail)
         .maybeSingle();
 
       if (existingEmail) {
@@ -66,7 +134,7 @@ export function Register() {
       const { data: existingUsername } = await supabase
         .from('profiles')
         .select('id')
-        .eq('username', username.trim())
+        .eq('username', cleanUsername)
         .maybeSingle();
 
       if (existingUsername) {
@@ -76,10 +144,10 @@ export function Register() {
       }
 
       const { data, error: signUpError } = await supabase.auth.signUp({
-        email: email.trim().toLowerCase(),
+        email: cleanEmail,
         password,
         options: {
-          data: { username }
+          data: { username: cleanUsername }
         }
       });
 
@@ -92,17 +160,21 @@ export function Register() {
         return;
       }
 
+      // Record successful registration for rate limit tracker
+      recordAction('register_flood');
+
       // Check if session is already active (i.e. email confirmation is disabled)
       if (data?.session) {
         navigate('/');
       } else {
         // Redirect to verify page with the email
-        navigate('/verify', { state: { email: email.trim().toLowerCase() } });
+        navigate('/verify', { state: { email: cleanEmail } });
       }
     } catch (err: any) {
       setError(err.message || 'Network error. Please try again later.');
     } finally {
       setLoading(false);
+      setSecurityStatus('');
     }
   };
 
@@ -129,8 +201,14 @@ export function Register() {
   };
 
   return (
-    <main className="container fade-in" style={{ flex: 1, padding: '8rem 1.5rem', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-      <div className="glass" style={{ width: '100%', maxWidth: '440px', padding: '2.5rem', borderRadius: '1.25rem', border: '1px solid var(--border-color)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
+    <main className="container fade-in" style={{ flex: 1, padding: '7rem 1.5rem', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+      <div className="glass" style={{ width: '100%', maxWidth: '450px', padding: '2.5rem', borderRadius: '1.25rem', border: '1px solid var(--border-color)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
+        
+        {/* Security Badge */}
+        <div style={{ marginBottom: '1.25rem' }}>
+          <SecurityBadge />
+        </div>
+
         <h1 style={{ fontSize: '2rem', fontWeight: 900, marginBottom: '0.25rem', textAlign: 'center' }}>Create Account</h1>
         <p style={{ color: 'var(--text-secondary)', textAlign: 'center', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
           Join the kamoted community. We'll send a verification code to your email.
@@ -144,11 +222,14 @@ export function Register() {
         {error && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#fca5a5', padding: '0.85rem 1rem', borderRadius: '0.75rem', fontSize: '0.85rem', marginBottom: '1.5rem', fontWeight: 600 }}>
             <XCircle size={18} color="#ef4444" style={{ flexShrink: 0 }} />
-            {error}
+            <div style={{ flex: 1 }}>{error}</div>
           </div>
         )}
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {/* Honeypot Trap */}
+          <HoneypotTrap value={honeypot} onChange={setHoneypot} name="kamoted_reg_trap" />
+
           {/* Username */}
           <div>
             <label style={labelStyle}>Username</label>
@@ -278,16 +359,31 @@ export function Register() {
               marginTop: '0.5rem', 
               display: 'flex', 
               justifyContent: 'center',
+              alignItems: 'center',
+              gap: '0.5rem',
               opacity: isFormValid ? 1 : 0.5,
               cursor: isFormValid ? 'pointer' : 'not-allowed'
             }}
           >
-            {loading ? <Loader2 className="animate-spin" size={20} /> : 'Create Account'}
+            {loading ? (
+              <>
+                <Loader2 className="animate-spin" size={18} />
+                <span>{securityStatus || 'Creating Account...'}</span>
+              </>
+            ) : (
+              'Create Account'
+            )}
           </button>
         </form>
         
         <div style={{ marginTop: '2rem', textAlign: 'center', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
           Already have an account? <Link to="/login" style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>Login</Link>
+        </div>
+
+        {/* Security Footer */}
+        <div style={{ marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', color: 'rgba(255,255,255,0.4)', fontSize: '0.72rem' }}>
+          <ShieldCheck size={13} color="#10b981" />
+          <span>Protected by Kamoted Shield • Anti-Bot & DDoS Guard</span>
         </div>
       </div>
     </main>

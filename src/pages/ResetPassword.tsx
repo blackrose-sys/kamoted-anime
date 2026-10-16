@@ -2,6 +2,13 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Loader2, Lock, Eye, EyeOff, CheckCircle2, XCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import {
+  isHoneypotTriggered,
+  ddosBurstShield,
+  generatePoWChallenge,
+  solvePoWChallenge
+} from '../lib/security';
+import { SecurityBadge, HoneypotTrap } from '../components/SecurityBadge';
 
 export function ResetPassword() {
   const [password, setPassword] = useState('');
@@ -11,6 +18,8 @@ export function ResetPassword() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [ready, setReady] = useState(false);
+  const [honeypot, setHoneypot] = useState('');
+  const [securityStatus, setSecurityStatus] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -56,10 +65,33 @@ export function ResetPassword() {
     e.preventDefault();
     if (!isFormValid) return;
 
+    // 1. DDoS burst shield
+    if (!ddosBurstShield.canMakeRequest()) {
+      setError('Too many requests detected. Kamoted DDoS protection throttled this action. Please pause for 5 seconds.');
+      return;
+    }
+
+    // 2. Anti-Bot Honeypot Trap
+    if (isHoneypotTriggered(honeypot)) {
+      console.warn('[Security] Bot honeypot triggered on reset password form.');
+      setLoading(true);
+      setTimeout(() => {
+        setLoading(false);
+        setSuccess(true);
+      }, 1000);
+      return;
+    }
+
     setLoading(true);
     setError('');
 
     try {
+      // 3. Computational Proof-of-Work puzzle
+      setSecurityStatus('Computing cryptographic check...');
+      const powChallenge = generatePoWChallenge(3);
+      await solvePoWChallenge(powChallenge);
+      setSecurityStatus('');
+
       const { error: updateError } = await supabase.auth.updateUser({
         password: password,
       });
@@ -76,6 +108,7 @@ export function ResetPassword() {
       setError(err.message || 'Failed to reset password.');
     } finally {
       setLoading(false);
+      setSecurityStatus('');
     }
   };
 
@@ -131,6 +164,11 @@ export function ResetPassword() {
           Please choose a new secure password.
         </p>
 
+        {/* Security Badge */}
+        <div style={{ marginBottom: '1.25rem' }}>
+          <SecurityBadge />
+        </div>
+
         {error ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', alignItems: 'center', textAlign: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#fca5a5', padding: '0.85rem 1rem', borderRadius: '0.75rem', fontSize: '0.85rem', fontWeight: 600 }}>
@@ -155,6 +193,9 @@ export function ResetPassword() {
           </div>
         ) : (
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            {/* Honeypot Trap */}
+            <HoneypotTrap value={honeypot} onChange={setHoneypot} name="kamoted_reset_trap" />
+
             <div>
               <label style={labelStyle}>New Password</label>
               <div style={{ position: 'relative' }}>
@@ -205,8 +246,15 @@ export function ResetPassword() {
               </div>
             )}
 
-            <button type="submit" className="btn-primary" disabled={loading || !isFormValid} style={{ marginTop: '0.5rem', display: 'flex', justifyContent: 'center' }}>
-              {loading ? <Loader2 className="animate-spin" size={20} /> : 'Reset Password'}
+            <button type="submit" className="btn-primary" disabled={loading || !isFormValid} style={{ marginTop: '0.5rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}>
+              {loading ? (
+                <>
+                  <Loader2 className="animate-spin" size={18} />
+                  <span>{securityStatus || 'Resetting Password...'}</span>
+                </>
+              ) : (
+                'Reset Password'
+              )}
             </button>
           </form>
         )}

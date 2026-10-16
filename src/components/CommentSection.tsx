@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { UserBadge } from './UserBadge';
 import { useProfileCache, resolveUsername, resolveAvatar } from '../hooks/useProfileCache';
+import { checkActionRateLimit, recordAction, sanitizeInput, ddosBurstShield } from '../lib/security';
 
 interface Comment {
   id: string;
@@ -229,6 +230,23 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
   const handlePost = async () => {
     if (!user || (!newComment.trim() && !mediaFile) || posting) return;
 
+    // 1. DDoS burst shield check
+    if (!ddosBurstShield.canMakeRequest()) {
+      alert('Too many requests detected. Anti-DDoS guard throttled this action. Please pause for 5 seconds.');
+      return;
+    }
+
+    // 2. Rate limit: max 5 comments per minute, 4s cooldown
+    const rateCheck = checkActionRateLimit(`comment_${user.id}`, {
+      maxRequests: 5,
+      windowSeconds: 60,
+      cooldownSeconds: 4
+    });
+    if (!rateCheck.allowed) {
+      alert(`Slow down! Rate limit active: please wait ${rateCheck.waitSeconds}s before posting another comment.`);
+      return;
+    }
+
     setPosting(true);
     
     let timestamp_sec: number | null = null;
@@ -265,13 +283,15 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
         media_type = mediaFile.type;
       }
 
+      const cleanContent = sanitizeInput(newComment);
+
       const { error } = await supabase.from('comments').insert({
         user_id: user.id,
         anime_id: numericAnimeId,
         episode,
         username: user.username,
         avatar_url: user.avatar_url || null,
-        content: newComment.trim() || ' ',
+        content: cleanContent || ' ',
         timestamp_sec,
         media_url,
         media_type
@@ -282,6 +302,8 @@ export function CommentSection({ animeId, episode }: CommentSectionProps) {
         alert('Failed to post comment: ' + (error.message || JSON.stringify(error)));
         return;
       }
+
+      recordAction(`comment_${user.id}`);
 
       setNewComment('');
       setMinutes('');
